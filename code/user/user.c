@@ -19,6 +19,12 @@ void *thread_func(void *param){
     char * string = "test!\n";
     size_t size = strlen(string);
     write(f, string, size);
+
+    char buffer[10];
+    read(f, buffer, 10);
+
+    printf("Thread has read: %s\n", buffer);
+
     close(f);
 	return NULL;
 }
