@@ -6,36 +6,86 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
+#include <errno.h>
 
-void *thread_func(void *param){
-	
-	printf("Thread is running\n");
+int i;
+char buff[4096];
+#define DATA "ciao a tutti\n"
+#define SIZE strlen(DATA)
 
-    int f = open((char*)param, O_WRONLY, 0666);
-    if(f == -1){
-        printf("Error while opened file: %s\n", (char*)param);
-        exit(0);
-    }
-    char * string = "test!\n";
-    size_t size = strlen(string);
-    write(f, string, size);
+void * the_thread(void* path){
 
-    char buffer[10];
-    read(f, buffer, 10);
+        char* device;
+        int fd;
 
-    printf("Thread has read: %s\n", buffer);
+        device = (char*)path;
 
-    close(f);
-	return NULL;
+        printf("opening device %s\n",device);
+        fd = open(device,O_RDWR);
+        if(fd == -1) {
+                printf("open error on device %s\n",device);
+                return NULL;
+        }
+        printf("device %s successfully opened\n",device);
+       
+        int input = 0;        
+        while (!input){
+
+                printf("Setting parameters:\n1. LOW priority level\n2. HIGH priority level\n3. BLOCKING r/w operations\n4. NON-BLOCKING r/w operations\n5. TIMEOUT blocking operations\n");
+
+                scanf("%d", &input);
+                int ret;
+                unsigned long timer = NULL;
+
+                if (input == 5){
+        
+                        timer = 500;
+                
+                }
+
+                ret = ioctl(fd, input + 2, timer);
+                if (ret == -1){
+                        printf("Error in ioctl() call (%d) (%s)\n", input + 2, strerror(errno));
+                        close(fd);
+                        return NULL;
+                }
+        }
+        
+        //write(fd,DATA,SIZE);
+        
+        close(fd);
+        return NULL;
+
 }
 
-int main(){
 
-    printf("NOTICE: it is required to create a node with:\nmknod /dev/test c 241 0\n");
-    //instead of create it manually, use mknod()
+int main(int argc, char** argv){
 
-	pthread_t thread_id;
-	pthread_create(&thread_id, NULL, thread_func, "/dev/test");
-	pthread_join(thread_id, NULL);
-	exit(0);
+     int ret;
+     int major;
+     int minors;
+     char *path;
+     pthread_t tid;
+
+     if(argc<4){
+        printf("useg: prog pathname major minors\n");
+        return -1;
+     }
+
+     path = argv[1];
+     major = strtol(argv[2],NULL,10);
+     minors = strtol(argv[3],NULL,10);
+     printf("creating %d minors for device %s with major %d\n",minors,path,major);
+
+     for(i=0;i<minors;i++){
+        sprintf(buff,"mknod %s%d c %d %i\n",path,i,major,i);
+        system(buff);
+        sprintf(buff,"%s%d",path,i);
+        pthread_create(&tid,NULL,the_thread,strdup(buff));
+        pthread_join(tid, NULL);
+     }
+
+     return 0;
+
 }

@@ -1,1 +1,0 @@
-cmd_/home/mattia/Desktop/linux_device_driver/code/Module.symvers := sed 's/ko$$/o/' /home/mattia/Desktop/linux_device_driver/code/modules.order | scripts/mod/modpost -m -a   -o /home/mattia/Desktop/linux_device_driver/code/Module.symvers -e -i Module.symvers   -T -
