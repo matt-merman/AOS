@@ -68,6 +68,66 @@ object_state objects[MINORS];
 
 #define OBJECT_MAX_SIZE  (4096) //just one page
 
+#define NO (0)
+#define YES (NO+1)
+
+typedef struct _control_record{
+        struct task_struct *task;       
+        int pid;
+        int awake;
+        struct hrtimer hr_timer;
+} control_record;
+
+static enum hrtimer_restart my_hrtimer_callback( struct hrtimer *timer ){
+
+        control_record *control;
+        struct task_struct *the_task;
+
+        control = (control_record*)container_of(timer,control_record, hr_timer);
+        control->awake = YES;
+        the_task = control->task;
+        wake_up_process(the_task);
+
+        return HRTIMER_NORESTART;
+}
+
+static int blocking_function(unsigned long timeout){
+
+   unsigned long microsecs = timeout;
+
+   control_record data;
+   control_record* control;
+   ktime_t ktime_interval;
+   DECLARE_WAIT_QUEUE_HEAD(the_queue);//here we use a private queue - wakeup is selective via wake_up_process
+
+   if(microsecs == 0) return 0;
+
+	control = &data;//set the pointer to the current stack area
+
+   printk("%s: thread %d going to usleep for %lu microsecs\n",MODNAME,current->pid,microsecs);
+
+   ktime_interval = ktime_set( 0, microsecs*1000 );
+
+   control->task = current;
+   control->pid  = current->pid;
+   control->awake = NO;
+
+   hrtimer_init(&(control->hr_timer), CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+
+   control->hr_timer.function = &my_hrtimer_callback;
+   hrtimer_start(&(control->hr_timer), ktime_interval, HRTIMER_MODE_REL);
+
+   wait_event_interruptible(the_queue, control->awake == YES);
+
+   hrtimer_cancel(&(control->hr_timer));
+   
+   printk("%s: thread %d exiting usleep\n",MODNAME, current->pid);
+
+	if(unlikely(control->awake != YES)) return -1;
+
+   return 0;
+}
+
 /* the actual driver */
 
 static int dev_open(struct inode *inode, struct file *file) {
@@ -126,6 +186,11 @@ static int dev_release(struct inode *inode, struct file *file) {
 
 }
 
+/*
+the high priority data flow must offer synchronous write operations while the low priority data flow must offer 
+an asynchronous execution (based on delayed work) of write operations, while still keeping 
+the interface able to synchronously notify the outcome.
+*/
 
 static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t *off) {
 
@@ -138,16 +203,50 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
   //need to lock in any case
   mutex_lock(&(the_object->operation_synchronizer));
+  
   if(*off >= OBJECT_MAX_SIZE) {//offset too large
  	 mutex_unlock(&(the_object->operation_synchronizer));
 	 return -ENOSPC;//no space left on device
   } 
+  
   if(*off > the_object->valid_bytes) {//offset bwyond the current stream size
  	 mutex_unlock(&(the_object->operation_synchronizer));
 	 return -ENOSR;//out of stream resources
-  } 
-  if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
-  ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
+  }
+
+   //low priority data flow must offer an asynchronous execution 
+   //(based on delayed work) of write operations
+   if(!the_object->priority){
+
+      //add work to queue
+      //...
+
+      if (the_object->blocking){
+
+         printk("%s: somebody called a BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+
+      }else{
+
+         printk("%s: somebody called a NON-BOLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+         
+      }
+
+   //high priority data flow must offer synchronous write operations
+   }else{
+
+      if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
+      ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
+
+      if (the_object->blocking){
+
+         printk("%s: somebody called a BLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+
+      }else{
+
+         printk("%s: somebody called a NON-BOLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+         
+      }
+   }
   
   *off += (len - ret);
   the_object->valid_bytes = *off;
@@ -157,6 +256,7 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
 }
 
+//After read operations, the read data disappear from the flow
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) {
 
   int minor = get_minor(filp);
@@ -164,24 +264,54 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
   object_state *the_object;
 
   the_object = objects + minor;
-  printk("%s: somebody called a read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
 
-  //need to lock in any case
-  mutex_lock(&(the_object->operation_synchronizer));
-  if(*off > the_object->valid_bytes) {
- 	 mutex_unlock(&(the_object->operation_synchronizer));
-	 return 0;
-  } 
-  if((the_object->valid_bytes - *off) < len) len = the_object->valid_bytes - *off;
-  ret = copy_to_user(buff,&(the_object->stream_content[*off]),len);
-  
+   if (!the_object->blocking){
+
+      printk("%s: somebody called a BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+      //bring the thread's TCB in waitqueue using sleep/wait service
+      blocking_function(the_object->timeout);
+
+      //need to lock in any case
+   mutex_lock(&(the_object->operation_synchronizer));
+   if(*off > the_object->valid_bytes) {
+      mutex_unlock(&(the_object->operation_synchronizer));
+      return 0;
+   }
+
+   if((the_object->valid_bytes - *off) < len) len = the_object->valid_bytes - *off;
+   ret = copy_to_user(buff,&(the_object->stream_content[*off]),len);
+
+   //remove data from the flow
+   //...
+
   *off += (len - ret);
   mutex_unlock(&(the_object->operation_synchronizer));
 
   return len - ret;
-   printk("%s: somebody called a read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
 
-  return 0;
+   }else{
+
+      printk("%s: somebody called a NON-BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+      
+   }
+   
+   //need to lock in any case
+   mutex_lock(&(the_object->operation_synchronizer));
+   if(*off > the_object->valid_bytes) {
+      mutex_unlock(&(the_object->operation_synchronizer));
+      return 0;
+   }
+
+   if((the_object->valid_bytes - *off) < len) len = the_object->valid_bytes - *off;
+   ret = copy_to_user(buff,&(the_object->stream_content[*off]),len);
+
+   //remove data from the flow
+   //...
+
+  *off += (len - ret);
+  mutex_unlock(&(the_object->operation_synchronizer));
+
+  return len - ret;
 
 }
 
@@ -199,7 +329,6 @@ static long dev_ioctl(struct file *filp, unsigned int command, unsigned long par
   object_state *the_object;
 
   the_object = objects + minor;
-  printk("%s: somebody called an ioctl on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
 
   //do here whathever you would like to control the state of the device
    switch(command){

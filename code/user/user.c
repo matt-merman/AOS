@@ -20,41 +20,77 @@ void * the_thread(void* path){
         int fd;
 
         device = (char*)path;
-
-        printf("opening device %s\n",device);
-        fd = open(device,O_RDWR);
-        if(fd == -1) {
-                printf("open error on device %s\n",device);
-                return NULL;
-        }
-        printf("device %s successfully opened\n",device);
        
         int input = 0;        
-        while (!input){
+        while (input != 8){
 
-                printf("Setting parameters:\n1. LOW priority level\n2. HIGH priority level\n3. BLOCKING r/w operations\n4. NON-BLOCKING r/w operations\n5. TIMEOUT blocking operations\n");
+                printf("Setting parameters:\n1. LOW priority level\n2. HIGH priority level\n3. BLOCKING r/w operations\n4. NON-BLOCKING r/w operations\n5. TIMEOUT blocking operations\n6. EXIT\n");
 
                 scanf("%d", &input);
+                input += 2;
                 int ret;
-                unsigned long timer = NULL;
+                unsigned long timeout = 0;
 
-                if (input == 5){
-        
-                        timer = 500;
+                if (input == 5 || input == 7){
+
+                        //get timeout from user
+                        printf("Insert a TIMEOUT for blocking operations\n");
+                        scanf("%lu", &timeout);
+
+                        ret = ioctl(fd, 7, timeout);
+                        if (ret == -1){
+                                printf("Error in ioctl() call (%d) (%s)\n", input, strerror(errno));
+                                close(fd);
+                                return NULL;
+                        }
                 
                 }
 
-                ret = ioctl(fd, input + 2, timer);
+                if (input == 7 || input == 8) break;
+
+                ret = ioctl(fd, input, timeout);
                 if (ret == -1){
-                        printf("Error in ioctl() call (%d) (%s)\n", input + 2, strerror(errno));
+                        printf("Error in ioctl() call (%d) (%s)\n", input, strerror(errno));
                         close(fd);
                         return NULL;
                 }
+                
         }
         
-        //write(fd,DATA,SIZE);
-        
-        close(fd);
+        input = 0;
+        while(input != 3){
+
+                printf("Choose operation:\n1. WRITE\n2. READ\n3. EXIT\n");
+                scanf("%d", &input);
+                
+                fd = open(device,O_RDWR);
+                if(fd == -1) {
+                        printf("open error on device %s\n",device);
+                        return NULL;
+                }
+
+                char test[SIZE];
+
+                switch(input){
+
+                        case 1:
+                                write(fd,DATA,SIZE);
+                                close(fd);
+                                break;
+                        case 2:
+
+                                //to fix
+                                read(fd,test,SIZE);
+                                close(fd);
+                                printf("read executed: %s\n", test);
+                                break;
+                        case 3:
+                                break;
+                        default:
+                                printf("Wrong input, retry\n");
+                }
+        }
+
         return NULL;
 
 }
