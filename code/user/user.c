@@ -18,9 +18,15 @@ void * the_thread(void* path){
 
         char* device;
         int fd;
-
+        
         device = (char*)path;
        
+        fd = open(device,O_RDWR);
+                if(fd == -1) {
+                        printf("open error on device %s\n",device);
+                        return NULL;
+                }
+
         int input = 0;        
         while (input != 8){
 
@@ -57,7 +63,9 @@ void * the_thread(void* path){
                 
         }
         
+        close(fd);
         input = 0;
+        
         while(input != 3){
 
                 printf("Choose operation:\n1. WRITE\n2. READ\n3. EXIT\n");

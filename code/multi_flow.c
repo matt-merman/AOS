@@ -6,24 +6,18 @@
 #define EXPORT_SYMTAB
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/sched.h>	
-#include <linux/pid.h>		/* For pid types */
 #include <linux/tty.h>		/* For the tty declarations */
 #include <linux/version.h>	/* For LINUX_VERSION_CODE */
 
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Francesco Quaglia");
-
-#define MODNAME "CHAR DEV"
+#include "timer.h"
+#include "work_queue.h"
+#include "info.h"
 
 static int dev_open(struct inode *, struct file *);
 static int dev_release(struct inode *, struct file *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
-
-#define DEVICE_NAME "my-new-dev"  /* Device file name in /dev/ - not mandatory  */
 
 //#define SINGLE_INSTANCE //just one session at a time across all I/O node 
 #define SINGLE_SESSION_OBJECT //just one session per I/O node at a time
@@ -67,66 +61,6 @@ typedef struct _object_state{
 object_state objects[MINORS];
 
 #define OBJECT_MAX_SIZE  (4096) //just one page
-
-#define NO (0)
-#define YES (NO+1)
-
-typedef struct _control_record{
-        struct task_struct *task;       
-        int pid;
-        int awake;
-        struct hrtimer hr_timer;
-} control_record;
-
-static enum hrtimer_restart my_hrtimer_callback( struct hrtimer *timer ){
-
-        control_record *control;
-        struct task_struct *the_task;
-
-        control = (control_record*)container_of(timer,control_record, hr_timer);
-        control->awake = YES;
-        the_task = control->task;
-        wake_up_process(the_task);
-
-        return HRTIMER_NORESTART;
-}
-
-static int blocking_function(unsigned long timeout){
-
-   unsigned long microsecs = timeout;
-
-   control_record data;
-   control_record* control;
-   ktime_t ktime_interval;
-   DECLARE_WAIT_QUEUE_HEAD(the_queue);//here we use a private queue - wakeup is selective via wake_up_process
-
-   if(microsecs == 0) return 0;
-
-	control = &data;//set the pointer to the current stack area
-
-   printk("%s: thread %d going to usleep for %lu microsecs\n",MODNAME,current->pid,microsecs);
-
-   ktime_interval = ktime_set( 0, microsecs*1000 );
-
-   control->task = current;
-   control->pid  = current->pid;
-   control->awake = NO;
-
-   hrtimer_init(&(control->hr_timer), CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-
-   control->hr_timer.function = &my_hrtimer_callback;
-   hrtimer_start(&(control->hr_timer), ktime_interval, HRTIMER_MODE_REL);
-
-   wait_event_interruptible(the_queue, control->awake == YES);
-
-   hrtimer_cancel(&(control->hr_timer));
-   
-   printk("%s: thread %d exiting usleep\n",MODNAME, current->pid);
-
-	if(unlikely(control->awake != YES)) return -1;
-
-   return 0;
-}
 
 /* the actual driver */
 
@@ -199,7 +133,6 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
   object_state *the_object;
 
   the_object = objects + minor;
-  printk("%s: somebody called a write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
 
   //need to lock in any case
   mutex_lock(&(the_object->operation_synchronizer));
@@ -219,7 +152,10 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
    if(!the_object->priority){
 
       //add work to queue
-      //...
+      put_work(0);
+      //to remove
+      if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
+      ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
 
       if (the_object->blocking){
 
@@ -269,25 +205,7 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
 
       printk("%s: somebody called a BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
       //bring the thread's TCB in waitqueue using sleep/wait service
-      blocking_function(the_object->timeout);
-
-      //need to lock in any case
-   mutex_lock(&(the_object->operation_synchronizer));
-   if(*off > the_object->valid_bytes) {
-      mutex_unlock(&(the_object->operation_synchronizer));
-      return 0;
-   }
-
-   if((the_object->valid_bytes - *off) < len) len = the_object->valid_bytes - *off;
-   ret = copy_to_user(buff,&(the_object->stream_content[*off]),len);
-
-   //remove data from the flow
-   //...
-
-  *off += (len - ret);
-  mutex_unlock(&(the_object->operation_synchronizer));
-
-  return len - ret;
+      blocking(the_object->timeout);
 
    }else{
 
@@ -329,7 +247,7 @@ static long dev_ioctl(struct file *filp, unsigned int command, unsigned long par
   object_state *the_object;
 
   the_object = objects + minor;
-
+         
   //do here whathever you would like to control the state of the device
    switch(command){
 
