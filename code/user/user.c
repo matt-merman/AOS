@@ -22,22 +22,41 @@ void * the_thread(void* path){
         device = (char*)path;
        
         fd = open(device,O_RDWR);
-                if(fd == -1) {
-                        printf("open error on device %s\n",device);
-                        return NULL;
-                }
+        if(fd == -1) {
+                printf("open error on device %s\n",device);
+                return NULL;
+        }
 
-        int input = 0;        
-        while (input != 8){
+        int input; 
+setting:        
+        input = 0;
+        while (input != 7){
 
-                printf("Setting parameters:\n1. LOW priority level\n2. HIGH priority level\n3. BLOCKING r/w operations\n4. NON-BLOCKING r/w operations\n5. TIMEOUT blocking operations\n6. EXIT\n");
+                printf("Setting parameters:\n1. LOW priority level\n2. HIGH priority level\n3. BLOCKING r/w operations\n4. NON-BLOCKING r/w operations\n5. EXIT\n");
 
                 scanf("%d", &input);
                 input += 2;
                 int ret;
                 unsigned long timeout = 0;
 
-                if (input == 5 || input == 7){
+                switch(input){
+
+                        case 3: case 4: case 5: case 6:
+                                
+                                ret = ioctl(fd, input, timeout);
+                                if (ret == -1){
+                                        printf("Error in ioctl() call (%d) (%s)\n", input, strerror(errno));
+                                        close(fd);
+                                        return NULL;
+                                }
+                                break;
+                        case 7:
+                                break;
+                        default:
+                                printf("Wrong input!\n");
+                }
+                
+                if (input == 5){
 
                         //get timeout from user
                         printf("Insert a TIMEOUT for blocking operations\n");
@@ -45,30 +64,19 @@ void * the_thread(void* path){
 
                         ret = ioctl(fd, 7, timeout);
                         if (ret == -1){
-                                printf("Error in ioctl() call (%d) (%s)\n", input, strerror(errno));
+                                printf("Error in ioctl() call (7) (%s)\n", strerror(errno));
                                 close(fd);
                                 return NULL;
                         }
-                
                 }
-
-                if (input == 7 || input == 8) break;
-
-                ret = ioctl(fd, input, timeout);
-                if (ret == -1){
-                        printf("Error in ioctl() call (%d) (%s)\n", input, strerror(errno));
-                        close(fd);
-                        return NULL;
-                }
-                
         }
         
         close(fd);
         input = 0;
         
-        while(input != 3){
+        while(input != 4){
 
-                printf("Choose operation:\n1. WRITE\n2. READ\n3. EXIT\n");
+                printf("Choose operation:\n1. WRITE\n2. READ\n3. SETTING\n4. EXIT\n");
                 scanf("%d", &input);
                 
                 fd = open(device,O_RDWR);
@@ -77,26 +85,37 @@ void * the_thread(void* path){
                         return NULL;
                 }
 
-                char test[SIZE];
+                int ret = 0;
+                char out[SIZE];
 
                 switch(input){
 
                         case 1:
-                                write(fd,DATA,SIZE);
-                                close(fd);
+                                ret = write(fd,DATA,SIZE);
+                                if (ret == -1){
+                                        printf("Error in write operation (%s)\n", strerror(errno));
+                                }else{
+                                        printf("Written %d bytes\n", ret);
+                                }
                                 break;
                         case 2:
-
                                 //to fix
-                                read(fd,test,SIZE);
-                                close(fd);
-                                printf("read executed: %s\n", test);
+                                ret = read(fd,out,SIZE);
+                                if (ret == -1){
+                                        printf("Error in read operation (%s)\n", strerror(errno));
+                                }else{
+                                        printf("Read %s string\n", out);
+                                }
                                 break;
                         case 3:
+                                goto setting;
+                        case 4:
                                 break;
                         default:
-                                printf("Wrong input, retry\n");
+                                printf("Wrong input!\n");
                 }
+
+                close(fd);
         }
 
         return NULL;

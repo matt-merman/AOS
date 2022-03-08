@@ -19,10 +19,6 @@ static int dev_open(struct inode *, struct file *);
 static int dev_release(struct inode *, struct file *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
 
-//#define SINGLE_INSTANCE //just one session at a time across all I/O node 
-#define SINGLE_SESSION_OBJECT //just one session per I/O node at a time
-
-
 static int Major;            /* Major number assigned to broadcast device driver */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
@@ -33,34 +29,16 @@ static int Major;            /* Major number assigned to broadcast device driver
 #define get_minor(session)	MINOR(session->f_dentry->d_inode->i_rdev)
 #endif
 
-#ifdef SINGLE_INSTANCE
-static DEFINE_MUTEX(device_state);
-#endif
-
 #define LOW_PRIORITY 0
 #define HIGH_PRIORITY 1
 #define BLOCKING 0
 #define NON_BLOCKING 1 
 
-typedef struct _object_state{
-#ifdef SINGLE_SESSION_OBJECT
-	struct mutex object_busy;
+#ifdef SINGLE_INSTANCE
+static DEFINE_MUTEX(device_state);
 #endif
-	struct mutex operation_synchronizer;
-	int valid_bytes;
-	char * stream_content;//the I/O node is a buffer in memory
-   
-   bool priority; //priority level (high or low) for the operations
-   bool blocking; //blocking vs non-blocking read and write operations
-   unsigned long timeout; //setup of a timeout regulating the awake of blocking operations
 
-
-} object_state;
-
-#define MINORS 8
 object_state objects[MINORS];
-
-#define OBJECT_MAX_SIZE  (4096) //just one page
 
 /* the actual driver */
 
@@ -152,18 +130,24 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
    if(!the_object->priority){
 
       //add work to queue
-      put_work(0);
-      //to remove
-      if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
-      ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
+      int ret = put_work(filp, buff, len, off, the_object);
 
+      //while still keeping the interface able to synchronously notify the outcome
+      //...
+
+      if (ret != 0){
+
+         mutex_unlock(&(the_object->operation_synchronizer));
+         printk("%s: Error on LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+         return -1;
+      }
       if (the_object->blocking){
 
          printk("%s: somebody called a BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
 
       }else{
 
-         printk("%s: somebody called a NON-BOLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+         printk("%s: somebody called a NON-BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
          
       }
 
@@ -179,7 +163,7 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
       }else{
 
-         printk("%s: somebody called a NON-BOLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+         printk("%s: somebody called a NON-BLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
          
       }
    }

@@ -26,18 +26,17 @@ static const struct modversion_info ____versions[]
 __used __section(__versions) = {
 	{ 0xb3753869, "module_layout" },
 	{ 0x6bc3fbc0, "__unregister_chrdev" },
-	{ 0x4302d0eb, "free_pages" },
 	{ 0xe6278ff5, "__register_chrdev" },
+	{ 0x4302d0eb, "free_pages" },
 	{ 0x6a5cb5ee, "__get_free_pages" },
 	{ 0x977f511b, "__mutex_init" },
-	{ 0x362ef408, "_copy_from_user" },
 	{ 0xc5b6f236, "queue_work_on" },
 	{ 0x2d3385d3, "system_wq" },
 	{ 0xf5cb25c8, "kmem_cache_alloc_trace" },
 	{ 0x35216b26, "kmalloc_caches" },
 	{ 0x1937241e, "try_module_get" },
+	{ 0xf21017d9, "mutex_trylock" },
 	{ 0xb44ad4b3, "_copy_to_user" },
-	{ 0x88db9f48, "__check_object_size" },
 	{ 0x2ab7989d, "mutex_lock" },
 	{ 0xdecd0b29, "__stack_chk_fail" },
 	{ 0xa0c6befa, "hrtimer_cancel" },
@@ -49,10 +48,11 @@ __used __section(__versions) = {
 	{ 0xfbdfc558, "hrtimer_start_range_ns" },
 	{ 0x1ee7d3cd, "hrtimer_init" },
 	{ 0x64c17a3f, "wake_up_process" },
-	{ 0xf21017d9, "mutex_trylock" },
 	{ 0x409bcb62, "mutex_unlock" },
 	{ 0x3ba859c1, "module_put" },
 	{ 0x37a0cba, "kfree" },
+	{ 0x362ef408, "_copy_from_user" },
+	{ 0x88db9f48, "__check_object_size" },
 	{ 0x7a2af7b4, "cpu_number" },
 	{ 0x1b44c663, "current_task" },
 	{ 0xc5850110, "printk" },
@@ -62,4 +62,4 @@ __used __section(__versions) = {
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "212E1DC6C3FF6D4B23EC52F");
+MODULE_INFO(srcversion, "844F0876979AFF1B369ADD6");
