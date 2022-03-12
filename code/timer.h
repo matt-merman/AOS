@@ -2,16 +2,6 @@
 source file usleep.c
 */
 
-#define EXPORT_SYMTAB
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/fs.h>
-#include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/version.h>
-#include <linux/time.h>
-#include <linux/string.h>
-
 #include "info.h"
 
 #define NO (0)

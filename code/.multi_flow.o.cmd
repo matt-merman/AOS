@@ -17,18 +17,31 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/arm64.h) \
     $(wildcard include/config/retpoline.h) \
     $(wildcard include/config/arch/use/builtin/bswap.h) \
-  include/linux/kernel.h \
-    $(wildcard include/config/preempt/voluntary.h) \
-    $(wildcard include/config/debug/atomic/sleep.h) \
-    $(wildcard include/config/mmu.h) \
-    $(wildcard include/config/prove/locking.h) \
-    $(wildcard include/config/arch/has/refcount.h) \
-    $(wildcard include/config/panic/timeout.h) \
+  /home/mattia/Desktop/linux_device_driver/code/timer.h \
+  /home/mattia/Desktop/linux_device_driver/code/info.h \
+  include/linux/module.h \
+    $(wildcard include/config/modules.h) \
+    $(wildcard include/config/sysfs.h) \
+    $(wildcard include/config/modules/tree/lookup.h) \
+    $(wildcard include/config/livepatch.h) \
+    $(wildcard include/config/unused/symbols.h) \
+    $(wildcard include/config/module/sig.h) \
+    $(wildcard include/config/generic/bug.h) \
+    $(wildcard include/config/kallsyms.h) \
+    $(wildcard include/config/smp.h) \
+    $(wildcard include/config/tracepoints.h) \
+    $(wildcard include/config/tree/srcu.h) \
+    $(wildcard include/config/bpf/events.h) \
+    $(wildcard include/config/jump/label.h) \
     $(wildcard include/config/tracing.h) \
+    $(wildcard include/config/event/tracing.h) \
     $(wildcard include/config/ftrace/mcount/record.h) \
-  /usr/lib/gcc/x86_64-linux-gnu/9/include/stdarg.h \
-  include/linux/limits.h \
-  include/uapi/linux/limits.h \
+    $(wildcard include/config/module/unload.h) \
+    $(wildcard include/config/constructors.h) \
+    $(wildcard include/config/function/error/injection.h) \
+    $(wildcard include/config/strict/module/rwx.h) \
+  include/linux/list.h \
+    $(wildcard include/config/debug/list.h) \
   include/linux/types.h \
     $(wildcard include/config/have/uid16.h) \
     $(wildcard include/config/uid16.h) \
@@ -51,15 +64,28 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/x86/32.h) \
   arch/x86/include/uapi/asm/posix_types_64.h \
   include/uapi/asm-generic/posix_types.h \
+  include/linux/poison.h \
+    $(wildcard include/config/illegal/pointer/value.h) \
+    $(wildcard include/config/page/poisoning/zero.h) \
+  include/linux/const.h \
+  include/uapi/linux/const.h \
+  include/linux/kernel.h \
+    $(wildcard include/config/preempt/voluntary.h) \
+    $(wildcard include/config/debug/atomic/sleep.h) \
+    $(wildcard include/config/mmu.h) \
+    $(wildcard include/config/prove/locking.h) \
+    $(wildcard include/config/arch/has/refcount.h) \
+    $(wildcard include/config/panic/timeout.h) \
+  /usr/lib/gcc/x86_64-linux-gnu/9/include/stdarg.h \
+  include/linux/limits.h \
+  include/uapi/linux/limits.h \
   include/linux/linkage.h \
   include/linux/stringify.h \
   include/linux/export.h \
     $(wildcard include/config/modversions.h) \
     $(wildcard include/config/module/rel/crcs.h) \
     $(wildcard include/config/have/arch/prel32/relocations.h) \
-    $(wildcard include/config/modules.h) \
     $(wildcard include/config/trim/unused/ksyms.h) \
-    $(wildcard include/config/unused/symbols.h) \
   include/linux/compiler.h \
     $(wildcard include/config/trace/branch/profiling.h) \
     $(wildcard include/config/profile/all/branches.h) \
@@ -68,7 +94,6 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/kasan.h) \
   arch/x86/include/asm/barrier.h \
   arch/x86/include/asm/alternative.h \
-    $(wildcard include/config/smp.h) \
   arch/x86/include/asm/asm.h \
   arch/x86/include/asm/nops.h \
     $(wildcard include/config/mk7.h) \
@@ -80,8 +105,6 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/x86/alignment/16.h) \
   include/linux/bitops.h \
   include/linux/bits.h \
-  include/linux/const.h \
-  include/uapi/linux/const.h \
   arch/x86/include/asm/bitops.h \
     $(wildcard include/config/x86/cmov.h) \
   arch/x86/include/asm/rmwcc.h \
@@ -132,7 +155,6 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/dynamic/debug.h) \
   include/linux/init.h \
     $(wildcard include/config/strict/kernel/rwx.h) \
-    $(wildcard include/config/strict/module/rwx.h) \
   include/linux/kern_levels.h \
   include/linux/cache.h \
     $(wildcard include/config/arch/has/cache/line/size.h) \
@@ -143,32 +165,12 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/x86/internode/cache/shift.h) \
     $(wildcard include/config/x86/vsmp.h) \
   include/linux/dynamic_debug.h \
-    $(wildcard include/config/jump/label.h) \
   include/linux/jump_label.h \
     $(wildcard include/config/have/arch/jump/label/relative.h) \
   arch/x86/include/asm/jump_label.h \
   include/linux/build_bug.h \
   arch/x86/include/asm/div64.h \
   include/asm-generic/div64.h \
-  include/linux/module.h \
-    $(wildcard include/config/sysfs.h) \
-    $(wildcard include/config/modules/tree/lookup.h) \
-    $(wildcard include/config/livepatch.h) \
-    $(wildcard include/config/module/sig.h) \
-    $(wildcard include/config/generic/bug.h) \
-    $(wildcard include/config/kallsyms.h) \
-    $(wildcard include/config/tracepoints.h) \
-    $(wildcard include/config/tree/srcu.h) \
-    $(wildcard include/config/bpf/events.h) \
-    $(wildcard include/config/event/tracing.h) \
-    $(wildcard include/config/module/unload.h) \
-    $(wildcard include/config/constructors.h) \
-    $(wildcard include/config/function/error/injection.h) \
-  include/linux/list.h \
-    $(wildcard include/config/debug/list.h) \
-  include/linux/poison.h \
-    $(wildcard include/config/illegal/pointer/value.h) \
-    $(wildcard include/config/page/poisoning/zero.h) \
   include/linux/stat.h \
   arch/x86/include/uapi/asm/stat.h \
   include/uapi/linux/stat.h \
@@ -849,25 +851,6 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
   include/linux/projid.h \
   include/uapi/linux/quota.h \
   include/linux/nfs_fs_i.h \
-  include/linux/tty.h \
-    $(wildcard include/config/tty.h) \
-  include/uapi/linux/major.h \
-  include/uapi/linux/termios.h \
-  arch/x86/include/generated/uapi/asm/termios.h \
-  include/asm-generic/termios.h \
-  include/linux/uaccess.h \
-  arch/x86/include/asm/uaccess.h \
-    $(wildcard include/config/x86/intel/usercopy.h) \
-  arch/x86/include/asm/smap.h \
-  arch/x86/include/asm/extable.h \
-  arch/x86/include/asm/uaccess_64.h \
-  include/uapi/asm-generic/termios.h \
-  arch/x86/include/generated/uapi/asm/termbits.h \
-  include/uapi/asm-generic/termbits.h \
-  arch/x86/include/generated/uapi/asm/ioctls.h \
-  include/uapi/asm-generic/ioctls.h \
-  include/linux/tty_driver.h \
-    $(wildcard include/config/console/poll.h) \
   include/linux/cdev.h \
   include/linux/device.h \
     $(wildcard include/config/debug/devres.h) \
@@ -898,24 +881,6 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/x86/dev/dma/ops.h) \
     $(wildcard include/config/pci/domains.h) \
   include/linux/pm_wakeup.h \
-  include/linux/seq_file.h \
-  include/linux/cred.h \
-    $(wildcard include/config/debug/credentials.h) \
-  include/linux/key.h \
-    $(wildcard include/config/net.h) \
-  include/linux/assoc_array.h \
-    $(wildcard include/config/associative/array.h) \
-  include/linux/sched/user.h \
-    $(wildcard include/config/fanotify.h) \
-    $(wildcard include/config/posix/mqueue.h) \
-    $(wildcard include/config/bpf/syscall.h) \
-  include/linux/tty_ldisc.h \
-  include/uapi/linux/tty_flags.h \
-  include/uapi/linux/tty.h \
-  include/generated/uapi/linux/version.h \
-  /home/mattia/Desktop/linux_device_driver/code/timer.h \
-  /home/mattia/Desktop/linux_device_driver/code/info.h \
-  /home/mattia/Desktop/linux_device_driver/code/work_queue.h \
   include/linux/kprobes.h \
     $(wildcard include/config/kprobes.h) \
     $(wildcard include/config/kretprobes.h) \
@@ -972,6 +937,12 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/have/arch/soft/dirty.h) \
     $(wildcard include/config/arch/enable/thp/migration.h) \
   arch/x86/include/asm/fpu/xstate.h \
+  include/linux/uaccess.h \
+  arch/x86/include/asm/uaccess.h \
+    $(wildcard include/config/x86/intel/usercopy.h) \
+  arch/x86/include/asm/smap.h \
+  arch/x86/include/asm/extable.h \
+  arch/x86/include/asm/uaccess_64.h \
   arch/x86/include/asm/fpu/api.h \
     $(wildcard include/config/x86/debug/fpu.h) \
   arch/x86/include/asm/pgtable_64.h \
@@ -1003,6 +974,16 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/have/exit/thread.h) \
     $(wildcard include/config/arch/wants/dynamic/task/struct.h) \
     $(wildcard include/config/have/arch/thread/struct/whitelist.h) \
+  include/linux/cred.h \
+    $(wildcard include/config/debug/credentials.h) \
+  include/linux/key.h \
+    $(wildcard include/config/net.h) \
+  include/linux/assoc_array.h \
+    $(wildcard include/config/associative/array.h) \
+  include/linux/sched/user.h \
+    $(wildcard include/config/fanotify.h) \
+    $(wildcard include/config/posix/mqueue.h) \
+    $(wildcard include/config/bpf/syscall.h) \
   include/linux/pid_namespace.h \
     $(wildcard include/config/pid/ns.h) \
   include/linux/nsproxy.h \
@@ -1051,6 +1032,25 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
   arch/x86/include/asm/insn.h \
   arch/x86/include/asm/inat.h \
   arch/x86/include/asm/inat_types.h \
+  include/generated/uapi/linux/version.h \
+  include/linux/tty.h \
+    $(wildcard include/config/tty.h) \
+  include/uapi/linux/major.h \
+  include/uapi/linux/termios.h \
+  arch/x86/include/generated/uapi/asm/termios.h \
+  include/asm-generic/termios.h \
+  include/uapi/asm-generic/termios.h \
+  arch/x86/include/generated/uapi/asm/termbits.h \
+  include/uapi/asm-generic/termbits.h \
+  arch/x86/include/generated/uapi/asm/ioctls.h \
+  include/uapi/asm-generic/ioctls.h \
+  include/linux/tty_driver.h \
+    $(wildcard include/config/console/poll.h) \
+  include/linux/seq_file.h \
+  include/linux/tty_ldisc.h \
+  include/uapi/linux/tty_flags.h \
+  include/uapi/linux/tty.h \
+  /home/mattia/Desktop/linux_device_driver/code/work_queue.h \
 
 /home/mattia/Desktop/linux_device_driver/code/multi_flow.o: $(deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o)
 

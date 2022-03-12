@@ -35,31 +35,32 @@ __used __section(__versions) = {
 	{ 0xf5cb25c8, "kmem_cache_alloc_trace" },
 	{ 0x35216b26, "kmalloc_caches" },
 	{ 0x1937241e, "try_module_get" },
-	{ 0xf21017d9, "mutex_trylock" },
+	{ 0x3ba859c1, "module_put" },
+	{ 0x37a0cba, "kfree" },
+	{ 0x7a2af7b4, "cpu_number" },
+	{ 0x362ef408, "_copy_from_user" },
+	{ 0x7aec9089, "clear_user" },
 	{ 0xb44ad4b3, "_copy_to_user" },
+	{ 0x88db9f48, "__check_object_size" },
 	{ 0x2ab7989d, "mutex_lock" },
-	{ 0xdecd0b29, "__stack_chk_fail" },
+	{ 0x1000e51, "schedule" },
 	{ 0xa0c6befa, "hrtimer_cancel" },
 	{ 0x92540fbf, "finish_wait" },
-	{ 0x1000e51, "schedule" },
 	{ 0x8c26d495, "prepare_to_wait_event" },
 	{ 0xfe487975, "init_wait_entry" },
 	{ 0xa1c76e0a, "_cond_resched" },
 	{ 0xfbdfc558, "hrtimer_start_range_ns" },
 	{ 0x1ee7d3cd, "hrtimer_init" },
-	{ 0x64c17a3f, "wake_up_process" },
-	{ 0x409bcb62, "mutex_unlock" },
-	{ 0x3ba859c1, "module_put" },
-	{ 0x37a0cba, "kfree" },
-	{ 0x362ef408, "_copy_from_user" },
-	{ 0x88db9f48, "__check_object_size" },
-	{ 0x7a2af7b4, "cpu_number" },
 	{ 0x1b44c663, "current_task" },
+	{ 0xdecd0b29, "__stack_chk_fail" },
+	{ 0x64c17a3f, "wake_up_process" },
+	{ 0xf21017d9, "mutex_trylock" },
 	{ 0xc5850110, "printk" },
+	{ 0x409bcb62, "mutex_unlock" },
 	{ 0xbdfb6dbb, "__fentry__" },
 };
 
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "844F0876979AFF1B369ADD6");
+MODULE_INFO(srcversion, "821353B7A80B1BC9C7D2630");

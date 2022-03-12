@@ -1,16 +1,3 @@
-
-/*  
- *  baseline char device driver with limitation on minor numbers - configurable in terms of concurrency 
- */
-
-#define EXPORT_SYMTAB
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/sched.h>	
-#include <linux/tty.h>		/* For the tty declarations */
-#include <linux/version.h>	/* For LINUX_VERSION_CODE */
-
 #include "timer.h"
 #include "work_queue.h"
 #include "info.h"
@@ -101,7 +88,7 @@ static int dev_release(struct inode *inode, struct file *file) {
 /*
 the high priority data flow must offer synchronous write operations while the low priority data flow must offer 
 an asynchronous execution (based on delayed work) of write operations, while still keeping 
-the interface able to synchronously notify the outcome.
+the interface able to synchronously notify the outcome (*).
 */
 
 static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t *off) {
@@ -112,67 +99,43 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
   the_object = objects + minor;
 
-  //need to lock in any case
-  mutex_lock(&(the_object->operation_synchronizer));
-  
-  if(*off >= OBJECT_MAX_SIZE) {//offset too large
- 	 mutex_unlock(&(the_object->operation_synchronizer));
-	 return -ENOSPC;//no space left on device
-  } 
-  
-  if(*off > the_object->valid_bytes) {//offset bwyond the current stream size
- 	 mutex_unlock(&(the_object->operation_synchronizer));
-	 return -ENOSR;//out of stream resources
-  }
+   //blocking operation
+   if(!the_object->blocking){
 
-   //low priority data flow must offer an asynchronous execution 
-   //(based on delayed work) of write operations
-   if(!the_object->priority){
-
-      //add work to queue
-      int ret = put_work(filp, buff, len, off, the_object);
-
-      //while still keeping the interface able to synchronously notify the outcome
-      //...
-
-      if (ret != 0){
-
-         mutex_unlock(&(the_object->operation_synchronizer));
-         printk("%s: Error on LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
-         return -1;
-      }
-      if (the_object->blocking){
-
-         printk("%s: somebody called a BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
-
-      }else{
-
-         printk("%s: somebody called a NON-BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
-         
-      }
-
-   //high priority data flow must offer synchronous write operations
+      //bring the thread's TCB in waitqueue using sleep/wait service
+      blocking(the_object->timeout);
+      ret = write(the_object, buff, off, len);
+      printk("%s: somebody called a BLOCKING write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+      
+   //non-blocking operation
    }else{
+      
+      //low priority data flow must offer an asynchronous execution 
+      //(based on delayed work) of write operations
+         
+      if(!the_object->priority){
 
-      if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
-      ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
+         //add work to queue
+         ret = put_work(filp, buff, len, off, the_object);
+         if (ret != 0){
 
-      if (the_object->blocking){
-
-         printk("%s: somebody called a BLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
-
+            printk("%s: Error on LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+            return -1;
+         }
+         
+         ret = len - ret; //(*)
+         printk("%s: somebody called a NON-BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+          
+      //high priority data flow must offer synchronous write operations
       }else{
 
+         ret = write(the_object, buff, off, len);
          printk("%s: somebody called a NON-BLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
-         
+            
       }
    }
   
-  *off += (len - ret);
-  the_object->valid_bytes = *off;
-  mutex_unlock(&(the_object->operation_synchronizer));
-
-  return len - ret;
+  return ret; //(*)
 
 }
 
@@ -209,6 +172,7 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
 
    //remove data from the flow
    //...
+   //ret = clear_user(buff, len);
 
   *off += (len - ret);
   mutex_unlock(&(the_object->operation_synchronizer));

@@ -1,18 +1,3 @@
-#define EXPORT_SYMTAB
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/fs.h>
-#include <linux/cdev.h>
-#include <linux/errno.h>
-#include <linux/device.h>
-#include <linux/kprobes.h>
-#include <linux/mutex.h>
-#include <linux/mm.h>
-#include <linux/sched.h>
-#include <linux/version.h>
-#include <linux/time.h>
-#include <linux/string.h>
-
 #include "info.h"
 
 //#define SINGLE_INSTANCE //just one session at a time across all I/O node 
@@ -30,7 +15,6 @@ typedef struct _object_state{
    bool blocking; //blocking vs non-blocking read and write operations
    unsigned long timeout; //setup of a timeout regulating the awake of blocking operations
 
-
 } object_state;
 
 typedef struct _packed_work{
@@ -42,10 +26,33 @@ typedef struct _packed_work{
         object_state *the_object;
 } packed_work;
 
+int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
+
+   //need to lock in any case
+   mutex_lock(&(the_object->operation_synchronizer));
+         
+   if(*off >= OBJECT_MAX_SIZE) {//offset too large
+      mutex_unlock(&(the_object->operation_synchronizer));
+      return -ENOSPC;//no space left on device
+   } 
+         
+   if(*off > the_object->valid_bytes) {//offset bwyond the current stream size
+      mutex_unlock(&(the_object->operation_synchronizer));
+      return -ENOSR;//out of stream resources
+   }
+
+   if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
+   int ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
+
+   *off += (len - ret);
+   the_object->valid_bytes = *off;
+   mutex_unlock(&(the_object->operation_synchronizer));
+
+   return len - ret;
+   
+}
 
 void delayed_write(unsigned long data){
-
-        int ret = 0;
 
         size_t len = container_of((void*)data,packed_work,the_work)->len;
         loff_t *off = container_of((void*)data,packed_work,the_work)->off;
@@ -54,9 +61,8 @@ void delayed_write(unsigned long data){
 
         printk("%s: this print comes from kworker daemon with PID=%d - running on CPU-core %d\n",MODNAME,current->pid,smp_processor_id());
     
-        if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
-        ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
-        
+        write(the_object, buff, off, len);
+
         printk("%s: releasing the task buffer at address %p - container of task is at %p\n",MODNAME,(void*)data,container_of((void*)data,packed_work,the_work));
 
         kfree((void*)container_of((void*)data,packed_work,the_work));
