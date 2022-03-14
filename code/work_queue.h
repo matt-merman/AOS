@@ -1,7 +1,7 @@
 #include "info.h"
 
 //#define SINGLE_INSTANCE //just one session at a time across all I/O node 
-#define SINGLE_SESSION_OBJECT //just one session per I/O node at a time
+//#define SINGLE_SESSION_OBJECT //just one session per I/O node at a time
 
 typedef struct _object_state{
 #ifdef SINGLE_SESSION_OBJECT
@@ -41,7 +41,19 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
       return -ENOSR;//out of stream resources
    }
 
-   if((OBJECT_MAX_SIZE - *off) < len) len = OBJECT_MAX_SIZE - *off;
+        //if len of data is less then max size 
+        //cut the extra bytes
+        if((OBJECT_MAX_SIZE - *off) < len){
+
+                len = OBJECT_MAX_SIZE - *off;
+
+        //need to do something in case the size  
+        //is greater then the max
+        }else{
+
+        //...
+        }
+
    int ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
 
    *off += (len - ret);

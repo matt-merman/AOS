@@ -5,6 +5,7 @@
 static int dev_open(struct inode *, struct file *);
 static int dev_release(struct inode *, struct file *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
+static long dev_ioctl(struct file *, unsigned int, unsigned long);
 
 static int Major;            /* Major number assigned to broadcast device driver */
 
@@ -26,8 +27,6 @@ static DEFINE_MUTEX(device_state);
 #endif
 
 object_state objects[MINORS];
-
-/* the actual driver */
 
 static int dev_open(struct inode *inode, struct file *file) {
 
@@ -167,14 +166,30 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
       return 0;
    }
 
-   if((the_object->valid_bytes - *off) < len) len = the_object->valid_bytes - *off;
-   ret = copy_to_user(buff,&(the_object->stream_content[*off]),len);
+   //if len of data is less then available memory 
+   //cut the extra bytes
+   if((the_object->valid_bytes - *off) < len){
+    
+      len = the_object->valid_bytes - *off;
+   
+   //need to do something in case the size  
+   //is greater then the available memory
+   }else{
 
-   //remove data from the flow
-   //...
-   //ret = clear_user(buff, len);
+      //...
+   }
+   
+   ret = copy_to_user(buff, &(the_object->stream_content[*off]), len);
 
-  *off += (len - ret);
+   printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,the_object->stream_content,get_major(filp),get_minor(filp));
+      
+   //remove data from the flow   
+   the_object->stream_content = "";
+
+   *off += (len - ret);
+
+   printk("%s: removed data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,the_object->stream_content,get_major(filp),get_minor(filp));
+   
   mutex_unlock(&(the_object->operation_synchronizer));
 
   return len - ret;
@@ -236,8 +251,6 @@ static struct file_operations fops = {
   .release = dev_release,
   .unlocked_ioctl = dev_ioctl
 };
-
-
 
 int init_module(void) {
 

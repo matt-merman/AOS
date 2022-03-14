@@ -39,9 +39,9 @@ __used __section(__versions) = {
 	{ 0x37a0cba, "kfree" },
 	{ 0x7a2af7b4, "cpu_number" },
 	{ 0x362ef408, "_copy_from_user" },
-	{ 0x7aec9089, "clear_user" },
 	{ 0xb44ad4b3, "_copy_to_user" },
 	{ 0x88db9f48, "__check_object_size" },
+	{ 0x409bcb62, "mutex_unlock" },
 	{ 0x2ab7989d, "mutex_lock" },
 	{ 0x1000e51, "schedule" },
 	{ 0xa0c6befa, "hrtimer_cancel" },
@@ -54,13 +54,11 @@ __used __section(__versions) = {
 	{ 0x1b44c663, "current_task" },
 	{ 0xdecd0b29, "__stack_chk_fail" },
 	{ 0x64c17a3f, "wake_up_process" },
-	{ 0xf21017d9, "mutex_trylock" },
 	{ 0xc5850110, "printk" },
-	{ 0x409bcb62, "mutex_unlock" },
 	{ 0xbdfb6dbb, "__fentry__" },
 };
 
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "821353B7A80B1BC9C7D2630");
+MODULE_INFO(srcversion, "8DEEDFBFA7B61A71529E6A6");
