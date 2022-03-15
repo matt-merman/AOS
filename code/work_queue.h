@@ -3,6 +3,13 @@
 //#define SINGLE_INSTANCE //just one session at a time across all I/O node 
 //#define SINGLE_SESSION_OBJECT //just one session per I/O node at a time
 
+//linked list used in write op.
+typedef struct _memory_node{
+   char* buffer;
+   struct _memory_node *next;
+   struct _memory_node *previous;
+} memory_node;
+
 typedef struct _object_state{
 #ifdef SINGLE_SESSION_OBJECT
 	struct mutex object_busy;
@@ -14,6 +21,8 @@ typedef struct _object_state{
    bool priority; //priority level (high or low) for the operations
    bool blocking; //blocking vs non-blocking read and write operations
    unsigned long timeout; //setup of a timeout regulating the awake of blocking operations
+
+        memory_node * head; //head to al written buffer 
 
 } object_state;
 
@@ -35,27 +44,42 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
       mutex_unlock(&(the_object->operation_synchronizer));
       return -ENOSPC;//no space left on device
    } 
-         
+   
    if(*off > the_object->valid_bytes) {//offset bwyond the current stream size
       mutex_unlock(&(the_object->operation_synchronizer));
       return -ENOSR;//out of stream resources
    }
 
-        //if len of data is less then max size 
-        //cut the extra bytes
-        if((OBJECT_MAX_SIZE - *off) < len){
-
-                len = OBJECT_MAX_SIZE - *off;
-
-        //need to do something in case the size  
-        //is greater then the max
-        }else{
-
-        //...
+        memory_node * new_node = kmalloc(sizeof(memory_node), GFP_KERNEL);
+        printk("%s: ALLOCATED a new memory node\n",MODNAME);
+        if(new_node == NULL){
+                printk("%s: unable to allocate a new memory node\n",MODNAME);
+                return -1;
         }
 
-   int ret = copy_from_user(&(the_object->stream_content[*off]),buff,len);
+        char * new_buffer = kmalloc(len, GFP_KERNEL);
+        printk("%s: ALLOCATED %ld bytes\n",MODNAME, len);
+        if(new_buffer == NULL){
+                printk("%s: unable to allocate memory\n",MODNAME);
+                return -1;
+        }
 
+        memory_node * current_node = the_object->head;
+        while(current_node->next != NULL){
+                current_node = current_node->next;
+        }
+
+        current_node->buffer = new_buffer;
+        //needed to link the last node with the new one
+        current_node->next = new_node;
+        new_node->next = NULL;
+
+        //needed for clear the flow after read op.
+        new_node->previous = current_node;
+
+        //returns the number of bytes NOT copied                        
+        int ret = copy_from_user(current_node->buffer, buff, len);          
+      
    *off += (len - ret);
    the_object->valid_bytes = *off;
    mutex_unlock(&(the_object->operation_synchronizer));

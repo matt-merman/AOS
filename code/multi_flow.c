@@ -92,6 +92,10 @@ the interface able to synchronously notify the outcome (*).
 
 static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t *off) {
 
+   //WARNING: circle buffer is buonded
+   //it does not print the whole buff 
+   //printk("%s: char: %c\nchar: %c\nlen: %ld\n",MODNAME, buff[4095], buff[4093], len);
+  
   int minor = get_minor(filp);
   int ret;
   object_state *the_object;
@@ -166,29 +170,55 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
       return 0;
    }
 
-   //if len of data is less then available memory 
+   //if len of destination buffer is greater then available memory 
    //cut the extra bytes
-   if((the_object->valid_bytes - *off) < len){
+   //if((the_object->valid_bytes - *off) < len){
     
-      len = the_object->valid_bytes - *off;
+     // len = the_object->valid_bytes - *off;
    
-   //need to do something in case the size  
-   //is greater then the available memory
-   }else{
-
-      //...
-   }
+   //}
    
-   ret = copy_to_user(buff, &(the_object->stream_content[*off]), len);
+   //ret = copy_to_user(buff, &(the_object->stream_content[*off]), len);
 
-   printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,the_object->stream_content,get_major(filp),get_minor(filp));
+   int index = 0;
+   int lenght = 0;
+   memory_node * current_node = the_object->head;
+   while(current_node->next != NULL){
+
+      lenght = strlen(current_node->buffer);
+      ret = copy_to_user(&buff[index], current_node->buffer, lenght);
+      current_node = current_node->next;
+      index += lenght;
+   } 
+
+   memory_node * last_node = current_node;
+   //remove data from the flow 
+   while(current_node->previous != NULL){
+
+      printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,current_node->buffer,get_major(filp),get_minor(filp));
+   
+      current_node = last_node->previous; 
+
+      //not required
+      current_node->next = NULL;
       
-   //remove data from the flow   
-   the_object->stream_content = "";
+      kfree(last_node->buffer);
+      kfree(last_node);
+
+      last_node = current_node;
+   }
+
+   /* TO TEST */
+   /*
+   current_node = the_object->head;
+   while(current_node->next != NULL){
+
+         printk("%s: data: '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,current_node->buffer,get_major(filp),get_minor(filp));
+         current_node = current_node->next;
+   } 
+   */
 
    *off += (len - ret);
-
-   printk("%s: removed data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,the_object->stream_content,get_major(filp),get_minor(filp));
    
   mutex_unlock(&(the_object->operation_synchronizer));
 
@@ -265,8 +295,18 @@ int init_module(void) {
 		objects[i].valid_bytes = 0;
 		objects[i].stream_content = NULL;
 		objects[i].stream_content = (char*)__get_free_page(GFP_KERNEL);
-		if(objects[i].stream_content == NULL) goto revert_allocation;
+      
+      //reserve memory for write op.
+      objects[i].head = kmalloc(sizeof(memory_node), GFP_KERNEL);
+      if(objects[i].head == NULL){
+         printk("%s: unable to allocate a new memory node\n",MODNAME);
+         return -1;
+      }
+      
+      objects[i].head->next = NULL;
+      objects[i].head->previous = NULL;
 
+		if(objects[i].stream_content == NULL) goto revert_allocation;
 
 	}
 
@@ -294,6 +334,8 @@ void cleanup_module(void) {
 	int i;
 	for(i=0;i<MINORS;i++){
 		free_page((unsigned long)objects[i].stream_content);
+      kfree(objects[i].head->buffer);
+      kfree(objects[i].head);
 	}
 
 	unregister_chrdev(Major, DEVICE_NAME);

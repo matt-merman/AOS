@@ -9,7 +9,7 @@
 #include <errno.h>
 
 char buff[4096];
-#define DATA "ciao mattia\n"
+#define DATA "ciao Mattia\n"
 #define SIZE strlen(DATA)
 #define LEN 4096
 
@@ -98,6 +98,7 @@ void * get_operation(char * device){
                 switch(input){
 
                         case 1:
+                                printf("%ld\n", SIZE);
                                 ret = write(fd,DATA,SIZE);
                                 if (ret == -1){
                                         printf("Error in write operation (%s)\n", strerror(errno));
@@ -112,6 +113,7 @@ void * get_operation(char * device){
                                 }else{
                                         printf("Read: %s\n", out);
                                 }
+                                memset(out, 0, LEN);
                                 break;
                         case 3:
                                 get_setting(fd, device);
