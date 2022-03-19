@@ -63,7 +63,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
                 printk("%s: unable to allocate memory\n",MODNAME);
                 return -1;
         }
-
+        
         memory_node * current_node = the_object->head;
         while(current_node->next != NULL){
                 current_node = current_node->next;
@@ -79,7 +79,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
 
         //returns the number of bytes NOT copied                        
         int ret = copy_from_user(current_node->buffer, buff, len);          
-      
+
    *off += (len - ret);
    the_object->valid_bytes = *off;
    mutex_unlock(&(the_object->operation_synchronizer));

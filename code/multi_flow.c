@@ -155,7 +155,7 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
 
       printk("%s: somebody called a BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
       //bring the thread's TCB in waitqueue using sleep/wait service
-      blocking(the_object->timeout);
+      //blocking(the_object->timeout);
 
    }else{
 
@@ -180,33 +180,209 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
    
    //ret = copy_to_user(buff, &(the_object->stream_content[*off]), len);
 
+   //if there is not data to read
+   if ((the_object->head)->buffer == NULL){
+      mutex_unlock(&(the_object->operation_synchronizer));
+      return 0;
+   }
+   
    int index = 0;
    int lenght = 0;
+   int residual_bytes = len;
+   int offset = *off;
    memory_node * current_node = the_object->head;
-   while(current_node->next != NULL){
+
+   printk("-------------HERE1------------\n");
+
+   while(residual_bytes != 0){
 
       lenght = strlen(current_node->buffer);
-      ret = copy_to_user(&buff[index], current_node->buffer, lenght);
+      if(current_node->next == NULL){
+
+         if (len > lenght) index = lenght; 
+         else index = len;
+
+            ret = copy_to_user(buff, current_node->buffer, index);
+            
+               printk("%s: current_node->buffer: %s [%d,%d]\n",MODNAME,current_node->buffer, get_major(filp),get_minor(filp));
+               kfree(current_node->buffer);
+
+               current_node->buffer = NULL;
+
+               the_object->head = current_node;
+               mutex_unlock(&(the_object->operation_synchronizer));
+               return 0;
+
+            }
+      /*if (offset > lenght){
+
+         offset -= lenght;
+      
+      }*/
+      //else{
+         
+         //if bytes read are greater then the requested byte 
+         if (lenght >= residual_bytes){
+            
+            ret = copy_to_user(&buff[index], &current_node->buffer[offset], residual_bytes);
+            current_node = current_node->next;
+            //residual_bytes = 0;
+            break;
+
+         }else{
+
+            residual_bytes -= lenght;
+            ret = copy_to_user(&buff[index], &current_node->buffer[offset], lenght);
+            index += lenght;
+         }
+     // }
+
       current_node = current_node->next;
-      index += lenght;
+   
    } 
 
-   memory_node * last_node = current_node;
+   //memory_node * last_node = current_node->previous;
+   //current_node->previous = NULL;
+   //the_object->head = current_node;
+
+   //current_node = last_node; 
    //remove data from the flow 
-   while(current_node->previous != NULL){
+   /*while(current_node->previous != NULL){
 
       printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,current_node->buffer,get_major(filp),get_minor(filp));
    
-      current_node = last_node->previous; 
-
       //not required
-      current_node->next = NULL;
-      
+      //current_node->next = NULL;
+     
       kfree(last_node->buffer);
+      current_node = last_node->previous; 
       kfree(last_node);
-
       last_node = current_node;
    }
+   */
+
+   //preserve remaining data
+   current_node = the_object->head;
+   lenght = strlen(current_node->buffer);
+   //memory_node * new_node = current_node->next;
+   
+   if(len < lenght){
+
+      residual_bytes = lenght - len;
+      char *deleted_buff = kmalloc(residual_bytes, GFP_KERNEL);
+      printk("%s: ALLOCATED %d bytes\n",MODNAME, residual_bytes);
+      if(deleted_buff == NULL){
+         printk("%s: unable to allocate memory\n",MODNAME);
+         return -1;
+      }
+
+      char *remaning_buff = kmalloc(len, GFP_KERNEL);
+      printk("%s: ALLOCATED %ld bytes\n",MODNAME, len);
+      if(remaning_buff == NULL){
+         printk("%s: unable to allocate memory\n",MODNAME);
+         return -1;
+      }
+
+      strncpy(remaning_buff, &current_node->buffer[len], lenght);
+      strncpy(deleted_buff, current_node->buffer, len);
+
+      printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,deleted_buff,get_major(filp),get_minor(filp));
+      
+      //to test ...
+      printk("%s: adding data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,remaning_buff,get_major(filp),get_minor(filp));
+         
+      kfree(current_node->buffer); 
+
+      current_node->buffer = kmalloc(lenght-len, GFP_KERNEL);
+      printk("%s: ALLOCATED %ld bytes\n",MODNAME, lenght-len);
+      if(current_node->buffer == NULL){
+         printk("%s: unable to allocate memory\n",MODNAME);
+         return -1;
+      }
+
+      strncpy(current_node->buffer, remaning_buff, lenght-len);
+      kfree(deleted_buff);
+      kfree(remaning_buff);
+
+   } else{ //if(len >= lenght){
+
+      int residual_bytes = len;
+      memory_node * deleted_node = current_node;
+      lenght = strlen(deleted_node->buffer);
+
+      while(residual_bytes > lenght){
+
+         residual_bytes -= lenght;
+         printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,deleted_node->buffer,get_major(filp),get_minor(filp));
+      
+         kfree(deleted_node->buffer);
+
+         current_node = deleted_node->next;
+         current_node->previous = NULL;
+
+         kfree(deleted_node);
+
+         deleted_node = current_node;
+
+         lenght = strlen(deleted_node->buffer);
+      }
+
+      len = residual_bytes;
+
+      residual_bytes = lenght - len;
+      char *deleted_buff = kmalloc(len, GFP_KERNEL);
+      printk("%s: ALLOCATED %ld bytes to deleted_buff\n",MODNAME, len);
+      if(deleted_buff == NULL){
+         printk("%s: unable to allocate memory\n",MODNAME);
+         return -1;
+      }
+
+      char *remaning_buff = kmalloc(lenght-len, GFP_KERNEL);
+      printk("%s: ALLOCATED %ld bytes to remaning_buff\n",MODNAME, lenght-len);
+      if(remaning_buff == NULL){
+         printk("%s: unable to allocate memory\n",MODNAME);
+         return -1;
+      }
+
+      strncpy(remaning_buff, &current_node->buffer[len], lenght);
+      strncpy(deleted_buff, current_node->buffer, len);
+
+      printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,deleted_buff,get_major(filp),get_minor(filp));
+      
+      printk("%s: adding data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,remaning_buff,get_major(filp),get_minor(filp));
+         
+      kfree(current_node->buffer); 
+
+      current_node->buffer = kmalloc(lenght-len, GFP_KERNEL);
+      printk("%s: ALLOCATED %ld bytes to current_node->buffer\n",MODNAME, lenght-len);
+      if(current_node->buffer == NULL){
+         printk("%s: unable to allocate memory\n",MODNAME);
+         return -1;
+      }
+
+      printk("%s: current_node->buffer: '%s'\nlen(current_node->buffer): '%ld'\nremaning_buff: '%s'\nlen(remaning_buff): '%ld'\nlenght-len: '%ld'\n[%d,%d]\n",MODNAME,current_node->buffer,strlen(current_node->buffer), remaning_buff, strlen(remaning_buff), lenght-len, get_major(filp),get_minor(filp));
+
+      strncpy(current_node->buffer, remaning_buff, lenght-len);
+      current_node->buffer[lenght-len]= '\0';
+      //(void)strlcpy(buf, input, sizeof(buf))
+
+      printk("%s: current_node->buffer: '%s'\nlen(current_node->buffer): '%ld'\nremaning_buff: '%s'\nlen(remaning_buff): '%ld'\nlenght-len: '%ld'\n[%d,%d]\n",MODNAME,current_node->buffer,strlen(current_node->buffer), remaning_buff, strlen(remaning_buff), lenght-len, get_major(filp),get_minor(filp));
+      
+      if (current_node->next == NULL){
+         printk("NULL\n");
+      }
+      kfree(deleted_buff);
+      kfree(remaning_buff);
+
+      current_node->next = NULL;
+      the_object->head = current_node;
+      }
+
+
+
+
+   //kfree(current_node->buffer); 
+   //kfree(current_node);
 
    /* TO TEST */
    /*
@@ -218,7 +394,7 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
    } 
    */
 
-   *off += (len - ret);
+   //*off += (len - ret);
    
   mutex_unlock(&(the_object->operation_synchronizer));
 
@@ -305,6 +481,7 @@ int init_module(void) {
       
       objects[i].head->next = NULL;
       objects[i].head->previous = NULL;
+      objects[i].head->buffer = NULL;
 
 		if(objects[i].stream_content == NULL) goto revert_allocation;
 
