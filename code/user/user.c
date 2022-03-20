@@ -9,7 +9,7 @@
 #include <errno.h>
 
 char buff[4096];
-#define DATA "Ciao Mattia\n"
+#define DATA "123456789\n"
 #define SIZE strlen(DATA)
 #define LEN 4096
 
@@ -113,7 +113,7 @@ void * get_operation(char * device){
                                 }else{
                                         printf("Read: %s\n", out);
                                 }
-                                memset(out, 0, 10);
+                                memset(out, 0, 16);
                                 break;
                         case 3:
                                 get_setting(fd, device);
@@ -147,6 +147,7 @@ int main(int argc, char** argv){
         printf("Creating %d minors for device %s with major %d\n",minors,path,major);
 
         int i;
+        minors = 1;
         for(i=0;i<minors;i++){
                 sprintf(buff,"mknod %s%d c %d %i 2> /dev/null\n",path,i,major,i);
                 system(buff);

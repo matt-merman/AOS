@@ -76,7 +76,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
 
         //needed for clear the flow after read op.
         new_node->previous = current_node;
-
+        new_node->buffer = NULL;
         //returns the number of bytes NOT copied                        
         int ret = copy_from_user(current_node->buffer, buff, len);          
 
