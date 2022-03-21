@@ -192,13 +192,12 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
    int offset = *off;
    memory_node * current_node = the_object->head;
 
-   //printk("-------------HERE1------------\n");
-
    //PHASE 1: READING
    while(residual_bytes != 0){
 
       if (current_node->buffer == NULL){
          
+         printk("-----------HERE1-----------\n");
          //ret = len
          break;
          
@@ -210,7 +209,6 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
             
             ret = copy_to_user(&buff[index], &current_node->buffer[offset], residual_bytes);
             current_node = current_node->next;
-            //residual_bytes = 0;
             break;
 
          }else{
@@ -220,8 +218,6 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
             index += lenght;
             if(current_node->next == NULL){
 
-               //kfree(current_node->buffer);
-               //current_node->buffer = NULL;
                break;
 
             }else current_node = current_node->next;
@@ -280,19 +276,6 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
             current_node = last_node;
 
          }
-      
-         if (residual_bytes == lenght){
-
-            kfree(last_node->buffer);
-            last_node->buffer = NULL;
-            
-            the_object->head = last_node;
-            //kfree(last_node);
-            mutex_unlock(&(the_object->operation_synchronizer));
-            return len - ret;
-
-         }
-
 
          char *remaning_buff = kmalloc(lenght - residual_bytes, GFP_KERNEL);
          printk("%s: ALLOCATED %d bytes\n",MODNAME, lenght - residual_bytes);
@@ -302,9 +285,7 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
          }
 
          strncpy(remaning_buff, &last_node->buffer[residual_bytes], lenght);
-         
-         //printk("%s: adding data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,remaning_buff,get_major(filp),get_minor(filp));
-            
+           
          kfree(last_node->buffer); 
 
          last_node->buffer = kmalloc(lenght - residual_bytes, GFP_KERNEL);
@@ -329,7 +310,21 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
    }else{
 
       residual_bytes = lenght - len;
-      
+
+      if(residual_bytes == 0){
+         kfree(current_node->buffer);
+         current_node->buffer = NULL;
+         
+         if(current_node->next != NULL){
+            the_object->head = current_node->next;
+            kfree(current_node);
+         }
+         //ret = len;
+         mutex_unlock(&(the_object->operation_synchronizer));
+         return len - ret;
+
+      }
+
       char *remaning_buff = kmalloc(residual_bytes, GFP_KERNEL);
       printk("%s: ALLOCATED %ld bytes\n",MODNAME, residual_bytes);
       if(remaning_buff == NULL){
@@ -354,16 +349,6 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
       kfree(remaning_buff);
 
    }
-   
-   /* TO TEST */
-   /*
-   current_node = the_object->head;
-   while(current_node->next != NULL){
-
-         printk("%s: data: '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,current_node->buffer,get_major(filp),get_minor(filp));
-         current_node = current_node->next;
-   } 
-   */
 
    //*off += (len - ret);
    
@@ -451,7 +436,6 @@ int init_module(void) {
       }
       
       objects[i].head->next = NULL;
-      objects[i].head->previous = NULL;
       objects[i].head->buffer = NULL;
 
 		if(objects[i].stream_content == NULL) goto revert_allocation;

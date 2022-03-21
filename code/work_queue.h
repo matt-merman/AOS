@@ -7,7 +7,6 @@
 typedef struct _memory_node{
    char* buffer;
    struct _memory_node *next;
-   struct _memory_node *previous;
 } memory_node;
 
 typedef struct _object_state{
@@ -73,10 +72,8 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
         //needed to link the last node with the new one
         current_node->next = new_node;
         new_node->next = NULL;
-
-        //needed for clear the flow after read op.
-        new_node->previous = current_node;
         new_node->buffer = NULL;
+        
         //returns the number of bytes NOT copied                        
         int ret = copy_from_user(current_node->buffer, buff, len);          
 
