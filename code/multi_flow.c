@@ -142,11 +142,39 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
 }
 
+static memory_node * shift_buffer(int lenght, int offset, memory_node * node){
+
+   int dim = lenght - offset;
+
+   char *remaning_buff = kmalloc(dim, GFP_KERNEL);
+   printk("%s: ALLOCATED %d bytes\n",MODNAME, dim);
+   if(remaning_buff == NULL){
+      printk("%s: unable to allocate memory\n",MODNAME);
+      return NULL;
+   }
+
+   strncpy(remaning_buff, &node->buffer[offset], lenght);
+   kfree(node->buffer); 
+
+   node->buffer = kmalloc(dim, GFP_KERNEL);
+   printk("%s: ALLOCATED %d bytes\n",MODNAME, dim);
+   if(node->buffer == NULL){
+      printk("%s: unable to allocate memory\n",MODNAME);
+      return NULL;
+   }
+
+   strncpy(node->buffer, remaning_buff, dim);  
+   kfree(remaning_buff);
+
+   return node;
+
+}
+
 //After read operations, the read data disappear from the flow
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) {
 
   int minor = get_minor(filp);
-  int ret;
+  int ret = 0;
   object_state *the_object;
 
   the_object = objects + minor;
@@ -170,148 +198,87 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
       return 0;
    }
 
-   //if len of destination buffer is greater then available memory 
-   //cut the extra bytes
-   //if((the_object->valid_bytes - *off) < len){
-    
-     // len = the_object->valid_bytes - *off;
-   
-   //}
-   
-   //ret = copy_to_user(buff, &(the_object->stream_content[*off]), len);
-
-   //if there is not data to read
-   if ((the_object->head)->buffer == NULL){
-      mutex_unlock(&(the_object->operation_synchronizer));
-      return 0;
-   }
-   
    int index = 0;
-   int lenght = 0;
+   int lenght_buffer = 0;
+   lenght_buffer -= *off;
    int residual_bytes = len;
-   int offset = *off;
    memory_node * current_node = the_object->head;
 
    //PHASE 1: READING
    while(residual_bytes != 0){
 
-      if (current_node->buffer == NULL){
+      if (current_node->buffer == NULL) break;
+
+      lenght_buffer = strlen(current_node->buffer);         
+
+      if (lenght_buffer < residual_bytes){
+
+         residual_bytes -= lenght_buffer;
+         ret += copy_to_user(&buff[index], &current_node->buffer[*off], lenght_buffer);
+         index += lenght_buffer;
          
-         printk("-----------HERE1-----------\n");
-         //ret = len
+         if(current_node->next == NULL) break;
+         else current_node = current_node->next;
+      
+      }else{
+
+         ret += copy_to_user(&buff[index], &current_node->buffer[*off], residual_bytes);
+         current_node = current_node->next;
          break;
-         
 
-      }else lenght = strlen(current_node->buffer);         
-         
-         //if bytes read are greater then the requested byte 
-         if (lenght >= residual_bytes){
-            
-            ret = copy_to_user(&buff[index], &current_node->buffer[offset], residual_bytes);
-            current_node = current_node->next;
-            break;
-
-         }else{
-
-            residual_bytes -= lenght;
-            ret = copy_to_user(&buff[index], &current_node->buffer[offset], lenght);
-            index += lenght;
-            if(current_node->next == NULL){
-
-               break;
-
-            }else current_node = current_node->next;
-         }   
+      }   
    }
 
    //PHASE 2: REMOVING 
    current_node = the_object->head;
-   lenght = strlen(current_node->buffer);
-   if(len > lenght){
+   
+   if(current_node->buffer == NULL){
+      *off += (len - ret);
+      mutex_unlock(&(the_object->operation_synchronizer));
+      return len - ret;
+   }
+   
+   lenght_buffer = strlen(current_node->buffer);
+   lenght_buffer -= *off;
+   if(len > lenght_buffer){
 
-      if(current_node->next == NULL){
+         residual_bytes = len;
+         memory_node * last_node;
 
-         kfree(current_node->buffer);
-         current_node->buffer = NULL;
-         //ret = len;
-         mutex_unlock(&(the_object->operation_synchronizer));
-         return len - ret;
+         while(!(residual_bytes < lenght_buffer)){
 
-      }else{
-
-         int residual_bytes = len;
-         memory_node * last_node = kmalloc(sizeof(memory_node), GFP_KERNEL);
-         printk("%s: ALLOCATED a new memory node\n",MODNAME);
-         if(last_node == NULL){
-               printk("%s: unable to allocate a new memory node\n",MODNAME);
-               return -1;
-         }
-
-         while(residual_bytes >= lenght){
-
-            residual_bytes -= lenght;
+            residual_bytes -= lenght_buffer;
             printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,current_node->buffer,get_major(filp),get_minor(filp));
          
-            kfree(current_node->buffer);
             last_node = current_node->next;
-            
+            kfree(current_node->buffer);
             kfree(current_node);
 
-            if(last_node == NULL){
-               
-               kfree(last_node->buffer);
-               last_node->buffer == NULL;               
-
+            if(last_node != NULL && last_node->buffer != NULL){ 
+               lenght_buffer = strlen(last_node->buffer);
+               current_node = last_node;
+               continue;
             }
 
-            if(last_node->buffer == NULL){
-               
-               the_object->head = last_node;
-               //kfree(last_node);
-               mutex_unlock(&(the_object->operation_synchronizer));
-               return len - ret;
+            else if (last_node->buffer == NULL) the_object->head = last_node;
             
-            }else lenght = strlen(last_node->buffer);
-
-            current_node = last_node;
+            *off += (len - ret);
+            mutex_unlock(&(the_object->operation_synchronizer));
+            return len - ret;
 
          }
 
-         char *remaning_buff = kmalloc(lenght - residual_bytes, GFP_KERNEL);
-         printk("%s: ALLOCATED %d bytes\n",MODNAME, lenght - residual_bytes);
-         if(remaning_buff == NULL){
-            printk("%s: unable to allocate memory\n",MODNAME);
-            return -1;
-         }
-
-         strncpy(remaning_buff, &last_node->buffer[residual_bytes], lenght);
-           
-         kfree(last_node->buffer); 
-
-         last_node->buffer = kmalloc(lenght - residual_bytes, GFP_KERNEL);
-         printk("%s: ALLOCATED %d bytes\n",MODNAME, lenght - residual_bytes);
-         if(last_node->buffer == NULL){
-            printk("%s: unable to allocate memory\n",MODNAME);
-            return -1;
-         }
-
-         strncpy(last_node->buffer, remaning_buff, lenght - residual_bytes);
-
-         printk("%s: adding data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,last_node->buffer,get_major(filp),get_minor(filp));
+         the_object->head = shift_buffer(lenght_buffer, residual_bytes, last_node);      
+         if(the_object->head == NULL){
             
-         kfree(remaning_buff);
+            mutex_unlock(&(the_object->operation_synchronizer));
+            *off += (len - ret);
+            return len - ret;
 
-         the_object->head = last_node;
+         }
 
-         //kfree(last_node);
-      
-      }
+   }else if(len == lenght_buffer){
 
-   }else{
-
-      residual_bytes = lenght - len;
-
-      if(residual_bytes == 0){
          kfree(current_node->buffer);
          current_node->buffer = NULL;
          
@@ -319,42 +286,22 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
             the_object->head = current_node->next;
             kfree(current_node);
          }
-         //ret = len;
+
+   }else{
+
+      current_node = shift_buffer(lenght_buffer, len, current_node);
+      if (current_node == NULL){
          mutex_unlock(&(the_object->operation_synchronizer));
+         *off += (len - ret);
          return len - ret;
-
-      }
-
-      char *remaning_buff = kmalloc(residual_bytes, GFP_KERNEL);
-      printk("%s: ALLOCATED %ld bytes\n",MODNAME, residual_bytes);
-      if(remaning_buff == NULL){
-         printk("%s: unable to allocate memory\n",MODNAME);
-         return -1;
-      }
-
-      strncpy(remaning_buff, &current_node->buffer[len], lenght);
-      
-      printk("%s: adding data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,remaning_buff,get_major(filp),get_minor(filp));
-         
-      kfree(current_node->buffer); 
-
-      current_node->buffer = kmalloc(residual_bytes, GFP_KERNEL);
-      printk("%s: ALLOCATED %ld bytes\n",MODNAME, residual_bytes);
-      if(current_node->buffer == NULL){
-         printk("%s: unable to allocate memory\n",MODNAME);
-         return -1;
-      }
-
-      strncpy(current_node->buffer, remaning_buff, residual_bytes);
-      kfree(remaning_buff);
+        
+      } 
 
    }
 
-   //*off += (len - ret);
-   
-  mutex_unlock(&(the_object->operation_synchronizer));
-
-  return len - ret;
+   *off += (len - ret);
+   mutex_unlock(&(the_object->operation_synchronizer));
+   return len - ret;
 
 }
 

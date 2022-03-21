@@ -49,30 +49,29 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
       return -ENOSR;//out of stream resources
    }
 
-        memory_node * new_node = kmalloc(sizeof(memory_node), GFP_KERNEL);
+        memory_node * node = kmalloc(sizeof(memory_node), GFP_KERNEL);
         printk("%s: ALLOCATED a new memory node\n",MODNAME);
-        if(new_node == NULL){
+        if(node == NULL){
                 printk("%s: unable to allocate a new memory node\n",MODNAME);
                 return -1;
         }
 
-        char * new_buffer = kmalloc(len, GFP_KERNEL);
+        char * buffer = kmalloc(len, GFP_KERNEL);
         printk("%s: ALLOCATED %ld bytes\n",MODNAME, len);
-        if(new_buffer == NULL){
+        if(buffer == NULL){
                 printk("%s: unable to allocate memory\n",MODNAME);
                 return -1;
         }
         
         memory_node * current_node = the_object->head;
-        while(current_node->next != NULL){
-                current_node = current_node->next;
-        }
+        
+        while(current_node->next != NULL) current_node = current_node->next;
 
-        current_node->buffer = new_buffer;
-        //needed to link the last node with the new one
-        current_node->next = new_node;
-        new_node->next = NULL;
-        new_node->buffer = NULL;
+        current_node->buffer = buffer;
+        current_node->next = node;
+
+        node->next = NULL;
+        node->buffer = NULL;
         
         //returns the number of bytes NOT copied                        
         int ret = copy_from_user(current_node->buffer, buff, len);          

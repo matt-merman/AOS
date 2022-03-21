@@ -93,7 +93,8 @@ void * get_operation(char * device){
                 }
 
                 int ret = 0;
-                char out[5];
+                int dim = 16;
+                char out[16];
 
                 switch(input){
 
@@ -107,13 +108,13 @@ void * get_operation(char * device){
                                 }
                                 break;
                         case 2:
-                                ret = read(fd,out,5);
+                                ret = read(fd,out,16);
                                 if (ret == -1){
                                         printf("Error in read operation (%s)\n", strerror(errno));
                                 }else{
                                         printf("Read: %s\n", out);
                                 }
-                                memset(out, 0, 5);
+                                memset(out, 0, 16);
                                 break;
                         case 3:
                                 get_setting(fd, device);
