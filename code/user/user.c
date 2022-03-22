@@ -8,10 +8,15 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 
-char buff[4096];
 #define DATA "123456789\n"
 #define SIZE strlen(DATA)
-#define LEN 4096
+
+#define MINORS 1
+
+char buff[4096];
+
+#define OUT_LEN 5
+char out[OUT_LEN];
 
 void * get_setting(int fd, char * device){
 
@@ -19,7 +24,7 @@ void * get_setting(int fd, char * device){
 
         while (input != 7){
 
-                printf("Setting parameters:\n1. LOW priority level\n2. HIGH priority level\n3. BLOCKING r/w operations\n4. NON-BLOCKING r/w operations\n5. GO TO OPERATIONS\n");
+                printf("\nSetting parameters:\n\n1. LOW priority level\n2. HIGH priority level\n3. BLOCKING r/w operations\n4. NON-BLOCKING r/w operations\n5. GO TO OPERATIONS\n\n");
 
                 scanf("%d", &input);
                 input += 2;
@@ -80,21 +85,19 @@ void * get_setting(int fd, char * device){
 void * get_operation(char * device){
 
         int input = 0;
-        
+        int fd;
+        int ret;
+
         while(input != 4){
 
                 printf("Choose operation:\n1. WRITE\n2. READ\n3. GO TO SETTINGS\n4. EXIT\n");
                 scanf("%d", &input);
                 
-                int fd = open(device,O_RDWR);
+                fd = open(device,O_RDWR);
                 if(fd == -1) {
                         printf("open error on device %s\n",device);
                         return NULL;
                 }
-
-                int ret = 0;
-                int dim = 16;
-                char out[16];
 
                 switch(input){
 
@@ -104,17 +107,17 @@ void * get_operation(char * device){
                                 if (ret == -1){
                                         printf("Error in write operation (%s)\n", strerror(errno));
                                 }else{
-                                        printf("Written %d bytes\n", ret);
+                                        printf("Written(%d Bytes): %s\n", ret, DATA);
                                 }
                                 break;
-                        case 2:
-                                ret = read(fd,out,16);
+                        case 2: 
+                                ret = read(fd,out,OUT_LEN);
                                 if (ret == -1){
                                         printf("Error in read operation (%s)\n", strerror(errno));
                                 }else{
-                                        printf("Read: %s\n", out);
+                                        printf("Read(%d Bytes): %s\n", ret, out);
                                 }
-                                memset(out, 0, 16);
+                                memset(out, 0, OUT_LEN);
                                 break;
                         case 3:
                                 get_setting(fd, device);
@@ -134,22 +137,23 @@ int main(int argc, char** argv){
 
         int ret;
         int major;
-        int minors;
         char *path;
 
-        if(argc<4){
-                printf("useg: prog pathname major minors\n");
+        if(argc<3){
+                printf("useg: prog pathname major\n");
                 return -1;
         }
 
         path = argv[1];
         major = strtol(argv[2],NULL,10);
-        minors = strtol(argv[3],NULL,10);
-        printf("Creating %d minors for device %s with major %d\n",minors,path,major);
-
+        
+        system("clear");
+        printf("**************************************\n");
+        printf("**             WELCOME              **\n");
+        printf("**************************************\n");
+        
         int i;
-        minors = 1;
-        for(i=0;i<minors;i++){
+        for(i=0;i<MINORS;i++){
                 sprintf(buff,"mknod %s%d c %d %i 2> /dev/null\n",path,i,major,i);
                 system(buff);
                 sprintf(buff,"%s%d",path,i);

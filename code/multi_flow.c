@@ -6,6 +6,7 @@ static int dev_open(struct inode *, struct file *);
 static int dev_release(struct inode *, struct file *);
 static ssize_t dev_write(struct file *, const char *, size_t, loff_t *);
 static long dev_ioctl(struct file *, unsigned int, unsigned long);
+static memory_node * shift_buffer(int, int, memory_node *);
 
 static int Major;            /* Major number assigned to broadcast device driver */
 
@@ -30,6 +31,7 @@ object_state objects[MINORS];
 
 static int dev_open(struct inode *inode, struct file *file) {
 
+   session * session;
    int minor;
    minor = get_minor(file);
 
@@ -49,7 +51,19 @@ static int dev_open(struct inode *inode, struct file *file) {
    }
 #endif
 
-   printk("%s: device file successfully opened for object with minor %d\n",MODNAME,minor);
+   /*
+   session = kmalloc(sizeof(session), GFP_KERNEL);
+   AUDIT printk("%s: ALLOCATED new session\n",MODNAME);
+   if(session == NULL){
+      printk("%s: unable to allocate new session\n",MODNAME);
+      return -1;
+   }
+
+   session->priority = HIGH_PRIORITY;
+   session->blocking = NON_BLOCKING;
+   session->timeout = 0;
+   */
+   AUDIT printk("%s: device file successfully opened for object with minor %d\n",MODNAME,minor);
 //device opened by a default nop
    return 0;
 
@@ -64,7 +78,6 @@ open_failure:
 
 }
 
-
 static int dev_release(struct inode *inode, struct file *file) {
 
   int minor;
@@ -78,7 +91,7 @@ static int dev_release(struct inode *inode, struct file *file) {
    mutex_unlock(&device_state);
 #endif
 
-   printk("%s: device file closed\n",MODNAME);
+   AUDIT printk("%s: device file closed\n",MODNAME);
 //device closed by default nop
    return 0;
 
@@ -108,7 +121,7 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
       //bring the thread's TCB in waitqueue using sleep/wait service
       blocking(the_object->timeout);
       ret = write(the_object, buff, off, len);
-      printk("%s: somebody called a BLOCKING write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+      AUDIT printk("%s: somebody called a BLOCKING write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
       
    //non-blocking operation
    }else{
@@ -127,13 +140,13 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
          }
          
          ret = len - ret; //(*)
-         printk("%s: somebody called a NON-BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+         AUDIT printk("%s: somebody called a NON-BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
           
       //high priority data flow must offer synchronous write operations
       }else{
 
          ret = write(the_object, buff, off, len);
-         printk("%s: somebody called a NON-BLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+         AUDIT printk("%s: somebody called a NON-BLOCKING HIGH priority write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
             
       }
    }
@@ -147,7 +160,7 @@ static memory_node * shift_buffer(int lenght, int offset, memory_node * node){
    int dim = lenght - offset;
 
    char *remaning_buff = kmalloc(dim, GFP_KERNEL);
-   printk("%s: ALLOCATED %d bytes\n",MODNAME, dim);
+   AUDIT printk("%s: ALLOCATED %d bytes\n",MODNAME, dim);
    if(remaning_buff == NULL){
       printk("%s: unable to allocate memory\n",MODNAME);
       return NULL;
@@ -157,7 +170,7 @@ static memory_node * shift_buffer(int lenght, int offset, memory_node * node){
    kfree(node->buffer); 
 
    node->buffer = kmalloc(dim, GFP_KERNEL);
-   printk("%s: ALLOCATED %d bytes\n",MODNAME, dim);
+   AUDIT printk("%s: ALLOCATED %d bytes\n",MODNAME, dim);
    if(node->buffer == NULL){
       printk("%s: unable to allocate memory\n",MODNAME);
       return NULL;
@@ -173,37 +186,38 @@ static memory_node * shift_buffer(int lenght, int offset, memory_node * node){
 //After read operations, the read data disappear from the flow
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) {
 
-  int minor = get_minor(filp);
-  int ret = 0;
-  object_state *the_object;
+   int ret = 0;
+   int minor = get_minor(filp);   
+   object_state *the_object;
+
+   int residual_bytes = len;
+   int lenght_buffer = 0;
+   memory_node * current_node;
+   memory_node * last_node;
 
   the_object = objects + minor;
 
    if (!the_object->blocking){
 
-      printk("%s: somebody called a BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+      AUDIT printk("%s: somebody called a BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
       //bring the thread's TCB in waitqueue using sleep/wait service
       //blocking(the_object->timeout);
 
    }else{
 
-      printk("%s: somebody called a NON-BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
+      AUDIT printk("%s: somebody called a NON-BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
       
    }
    
    //need to lock in any case
    mutex_lock(&(the_object->operation_synchronizer));
-   if(*off > the_object->valid_bytes) {
+   /*if(*off > the_object->valid_bytes) {
       mutex_unlock(&(the_object->operation_synchronizer));
       return 0;
-   }
+   }*/
 
-   int index = 0;
-   int lenght_buffer = 0;
    lenght_buffer -= *off;
-   int residual_bytes = len;
-   memory_node * current_node = the_object->head;
-
+   current_node = the_object->head;
    //PHASE 1: READING
    while(residual_bytes != 0){
 
@@ -214,15 +228,16 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
       if (lenght_buffer < residual_bytes){
 
          residual_bytes -= lenght_buffer;
-         ret += copy_to_user(&buff[index], &current_node->buffer[*off], lenght_buffer);
-         index += lenght_buffer;
-         
+         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], lenght_buffer);
+         ret += lenght_buffer;
+
          if(current_node->next == NULL) break;
          else current_node = current_node->next;
       
       }else{
 
-         ret += copy_to_user(&buff[index], &current_node->buffer[*off], residual_bytes);
+         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], residual_bytes);
+         ret += residual_bytes;
          current_node = current_node->next;
          break;
 
@@ -233,9 +248,9 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
    current_node = the_object->head;
    
    if(current_node->buffer == NULL){
-      *off += (len - ret);
+      *off += len - ret;
       mutex_unlock(&(the_object->operation_synchronizer));
-      return len - ret;
+      return ret;
    }
    
    lenght_buffer = strlen(current_node->buffer);
@@ -243,12 +258,11 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
    if(len > lenght_buffer){
 
          residual_bytes = len;
-         memory_node * last_node;
 
          while(!(residual_bytes < lenght_buffer)){
 
             residual_bytes -= lenght_buffer;
-            printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,current_node->buffer,get_major(filp),get_minor(filp));
+            AUDIT printk("%s: removing data '%s' from the flow on dev with [major,minor] number [%d,%d]\n",MODNAME,current_node->buffer,get_major(filp),get_minor(filp));
          
             last_node = current_node->next;
             kfree(current_node->buffer);
@@ -262,9 +276,9 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
 
             else if (last_node->buffer == NULL) the_object->head = last_node;
             
-            *off += (len - ret);
+            *off += len - ret;
             mutex_unlock(&(the_object->operation_synchronizer));
-            return len - ret;
+            return ret;
 
          }
 
@@ -272,8 +286,8 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
          if(the_object->head == NULL){
             
             mutex_unlock(&(the_object->operation_synchronizer));
-            *off += (len - ret);
-            return len - ret;
+            *off += len - ret;
+            return ret;
 
          }
 
@@ -292,16 +306,16 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
       current_node = shift_buffer(lenght_buffer, len, current_node);
       if (current_node == NULL){
          mutex_unlock(&(the_object->operation_synchronizer));
-         *off += (len - ret);
-         return len - ret;
+         *off += len - ret;
+         return ret;
         
       } 
 
    }
 
-   *off += (len - ret);
+   *off += len - ret;
    mutex_unlock(&(the_object->operation_synchronizer));
-   return len - ret;
+   return ret;
 
 }
 
@@ -326,27 +340,26 @@ static long dev_ioctl(struct file *filp, unsigned int command, unsigned long par
       //2 cannot be used
       case 3:
          the_object->priority = LOW_PRIORITY;
-         printk("%s: somebody has set priority level to LOW on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
+         AUDIT printk("%s: somebody has set priority level to LOW on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 4:
          the_object->priority = HIGH_PRIORITY;
-         printk("%s: somebody has set priority level to HIGH on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
+         AUDIT printk("%s: somebody has set priority level to HIGH on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 5:
          the_object->blocking = BLOCKING;
-         printk("%s: somebody has set BLOCKING r/w op on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
+         AUDIT printk("%s: somebody has set BLOCKING r/w op on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 6:
          the_object->blocking = NON_BLOCKING;
-         printk("%s: somebody has set NON-BLOCKING r/w on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
+         AUDIT printk("%s: somebody has set NON-BLOCKING r/w on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 7:
          the_object->timeout = param;
-         printk("%s: somebody has set TIMEOUT on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
+         AUDIT printk("%s: somebody has set TIMEOUT on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
-
       default:
-         printk("%s: somebody called an invalid setting on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command); 
+         AUDIT printk("%s: somebody called an invalid setting on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command); 
    }
   return 0;
 
@@ -371,21 +384,21 @@ int init_module(void) {
 		mutex_init(&(objects[i].object_busy));
 #endif
 		mutex_init(&(objects[i].operation_synchronizer));
-		objects[i].valid_bytes = 0;
-		objects[i].stream_content = NULL;
-		objects[i].stream_content = (char*)__get_free_page(GFP_KERNEL);
+		//objects[i].valid_bytes = 0;
+		//objects[i].stream_content = NULL;
+		//objects[i].stream_content = (char*)__get_free_page(GFP_KERNEL);
       
       //reserve memory for write op.
       objects[i].head = kmalloc(sizeof(memory_node), GFP_KERNEL);
       if(objects[i].head == NULL){
          printk("%s: unable to allocate a new memory node\n",MODNAME);
-         return -1;
+         goto revert_allocation;
       }
       
       objects[i].head->next = NULL;
       objects[i].head->buffer = NULL;
 
-		if(objects[i].stream_content == NULL) goto revert_allocation;
+		//if(objects[i].stream_content == NULL) goto revert_allocation;
 
 	}
 
@@ -397,13 +410,14 @@ int init_module(void) {
 	  return Major;
 	}
 
-	printk(KERN_INFO "%s: new device registered, it is assigned major number %d\n",MODNAME, Major);
+	AUDIT printk(KERN_INFO "%s: new device registered, it is assigned major number %d\n",MODNAME, Major);
 
 	return 0;
 
 revert_allocation:
 	for(;i>=0;i--){
-		free_page((unsigned long)objects[i].stream_content);
+      kfree(objects[i].head);
+		//free_page((unsigned long)objects[i].stream_content);
 	}
 	return -ENOMEM;
 }
@@ -412,14 +426,14 @@ void cleanup_module(void) {
 
 	int i;
 	for(i=0;i<MINORS;i++){
-		free_page((unsigned long)objects[i].stream_content);
+		//free_page((unsigned long)objects[i].stream_content);
       kfree(objects[i].head->buffer);
       kfree(objects[i].head);
 	}
 
 	unregister_chrdev(Major, DEVICE_NAME);
 
-	printk(KERN_INFO "%s: new device unregistered, it was assigned major number %d\n",MODNAME, Major);
+	AUDIT printk(KERN_INFO "%s: new device unregistered, it was assigned major number %d\n",MODNAME, Major);
 
 	return;
 

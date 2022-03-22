@@ -40,7 +40,7 @@ static int blocking(unsigned long timeout){
 
 	control = &data;//set the pointer to the current stack area
 
-   printk("%s: thread %d going to usleep for %lu microsecs\n",MODNAME,current->pid,microsecs);
+   AUDIT printk("%s: thread %d going to usleep for %lu microsecs\n",MODNAME,current->pid,microsecs);
 
    ktime_interval = ktime_set( 0, microsecs*1000 );
 
@@ -57,7 +57,7 @@ static int blocking(unsigned long timeout){
 
    hrtimer_cancel(&(control->hr_timer));
    
-   printk("%s: thread %d exiting usleep\n",MODNAME, current->pid);
+   AUDIT printk("%s: thread %d exiting usleep\n",MODNAME, current->pid);
 
 	if(unlikely(control->awake != YES)) return -1;
 
