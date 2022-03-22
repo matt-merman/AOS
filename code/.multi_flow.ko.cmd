@@ -1,0 +1,1 @@
+cmd_/home/mattia/Desktop/linux_device_driver/code/multi_flow.ko := ld -r -m elf_x86_64  -z max-page-size=0x200000  --build-id  -T ./scripts/module-common.lds -o /home/mattia/Desktop/linux_device_driver/code/multi_flow.ko /home/mattia/Desktop/linux_device_driver/code/multi_flow.o /home/mattia/Desktop/linux_device_driver/code/multi_flow.mod.o;  true

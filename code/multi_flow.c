@@ -27,7 +27,7 @@ static int Major;            /* Major number assigned to broadcast device driver
 static DEFINE_MUTEX(device_state);
 #endif
 
-object_state objects[MINORS];
+object_state objects[MINORS][NUM_FLOW];
 
 static int dev_open(struct inode *inode, struct file *file) {
 
@@ -51,7 +51,7 @@ static int dev_open(struct inode *inode, struct file *file) {
    }
 #endif
 
-   /*
+
    session = kmalloc(sizeof(session), GFP_KERNEL);
    AUDIT printk("%s: ALLOCATED new session\n",MODNAME);
    if(session == NULL){
@@ -62,7 +62,9 @@ static int dev_open(struct inode *inode, struct file *file) {
    session->priority = HIGH_PRIORITY;
    session->blocking = NON_BLOCKING;
    session->timeout = 0;
-   */
+   file->private_data = session;
+   
+
    AUDIT printk("%s: device file successfully opened for object with minor %d\n",MODNAME,minor);
 //device opened by a default nop
    return 0;
@@ -81,6 +83,7 @@ open_failure:
 static int dev_release(struct inode *inode, struct file *file) {
 
   int minor;
+  session * session;
   minor = get_minor(file);
 
 #ifdef SINGLE_SESSION_OBJECT
@@ -90,6 +93,9 @@ static int dev_release(struct inode *inode, struct file *file) {
 #ifdef SINGLE_INSTANCE
    mutex_unlock(&device_state);
 #endif
+
+   session = file->private_data;
+   kfree(session);
 
    AUDIT printk("%s: device file closed\n",MODNAME);
 //device closed by default nop
@@ -112,14 +118,15 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
   int minor = get_minor(filp);
   int ret;
   object_state *the_object;
-
+   session * session;
+   session = filp->private_data;
   the_object = objects + minor;
 
    //blocking operation
-   if(!the_object->blocking){
+   if(!session->blocking){
 
       //bring the thread's TCB in waitqueue using sleep/wait service
-      blocking(the_object->timeout);
+      blocking(session->timeout);
       ret = write(the_object, buff, off, len);
       AUDIT printk("%s: somebody called a BLOCKING write on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
       
@@ -129,7 +136,7 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
       //low priority data flow must offer an asynchronous execution 
       //(based on delayed work) of write operations
          
-      if(!the_object->priority){
+      if(!session->priority){
 
          //add work to queue
          ret = put_work(filp, buff, len, off, the_object);
@@ -189,19 +196,21 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off) 
    int ret = 0;
    int minor = get_minor(filp);   
    object_state *the_object;
+   session * session;
 
    int residual_bytes = len;
    int lenght_buffer = 0;
    memory_node * current_node;
    memory_node * last_node;
 
+   session = filp->private_data;
   the_object = objects + minor;
 
-   if (!the_object->blocking){
+   if (!session->blocking){
 
       AUDIT printk("%s: somebody called a BLOCKING read on dev with [major,minor] number [%d,%d]\n",MODNAME,get_major(filp),get_minor(filp));
       //bring the thread's TCB in waitqueue using sleep/wait service
-      //blocking(the_object->timeout);
+      blocking(session->timeout);
 
    }else{
 
@@ -329,33 +338,35 @@ as follows:
 
 static long dev_ioctl(struct file *filp, unsigned int command, unsigned long param) {
 
-  int minor = get_minor(filp);
-  object_state *the_object;
+   session * session;
+   //int minor = get_minor(filp);
+   //object_state *the_object;
 
-  the_object = objects + minor;
+   session = filp->private_data;
+   //the_object = objects + minor;
          
   //do here whathever you would like to control the state of the device
    switch(command){
 
       //2 cannot be used
       case 3:
-         the_object->priority = LOW_PRIORITY;
+         session->priority = LOW_PRIORITY;
          AUDIT printk("%s: somebody has set priority level to LOW on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 4:
-         the_object->priority = HIGH_PRIORITY;
+         session->priority = HIGH_PRIORITY;
          AUDIT printk("%s: somebody has set priority level to HIGH on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 5:
-         the_object->blocking = BLOCKING;
+         session->blocking = BLOCKING;
          AUDIT printk("%s: somebody has set BLOCKING r/w op on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 6:
-         the_object->blocking = NON_BLOCKING;
+         session->blocking = NON_BLOCKING;
          AUDIT printk("%s: somebody has set NON-BLOCKING r/w on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       case 7:
-         the_object->timeout = param;
+         session->timeout = param;
          AUDIT printk("%s: somebody has set TIMEOUT on dev with [major,minor] number [%d,%d] and command %u \n",MODNAME,get_major(filp),get_minor(filp),command);
          break;
       default:
@@ -376,29 +387,32 @@ static struct file_operations fops = {
 
 int init_module(void) {
 
-	int i;
-
+	int i, j;
 	//initialize the drive internal state
 	for(i=0;i<MINORS;i++){
 #ifdef SINGLE_SESSION_OBJECT
 		mutex_init(&(objects[i].object_busy));
 #endif
-		mutex_init(&(objects[i].operation_synchronizer));
-		//objects[i].valid_bytes = 0;
-		//objects[i].stream_content = NULL;
-		//objects[i].stream_content = (char*)__get_free_page(GFP_KERNEL);
-      
-      //reserve memory for write op.
-      objects[i].head = kmalloc(sizeof(memory_node), GFP_KERNEL);
-      if(objects[i].head == NULL){
-         printk("%s: unable to allocate a new memory node\n",MODNAME);
-         goto revert_allocation;
-      }
-      
-      objects[i].head->next = NULL;
-      objects[i].head->buffer = NULL;
 
-		//if(objects[i].stream_content == NULL) goto revert_allocation;
+      for (j=0;j<NUM_FLOW;j++){
+
+         mutex_init(&(objects[i][j].operation_synchronizer));
+         //objects[i].valid_bytes = 0;
+         //objects[i].stream_content = NULL;
+         //objects[i].stream_content = (char*)__get_free_page(GFP_KERNEL);
+         
+         //reserve memory to write op.
+         objects[i][j].head = kmalloc(sizeof(memory_node), GFP_KERNEL);
+         if(objects[i][j].head == NULL){
+            printk("%s: unable to allocate a new memory node\n",MODNAME);
+            goto revert_allocation;
+         }
+         
+         objects[i][j].head->next = NULL;
+         objects[i][j].head->buffer = NULL;
+
+         //if(objects[i].stream_content == NULL) goto revert_allocation;
+      }
 
 	}
 
@@ -416,20 +430,27 @@ int init_module(void) {
 
 revert_allocation:
 	for(;i>=0;i--){
-      kfree(objects[i].head);
-		//free_page((unsigned long)objects[i].stream_content);
-	}
+   	for(;j>=0;j--){
+
+         kfree(objects[i][j].head);
+		   //free_page((unsigned long)objects[i].stream_content);
+      }
+   }  
 	return -ENOMEM;
 }
 
 void cleanup_module(void) {
 
-	int i;
+	int i, j;
+
 	for(i=0;i<MINORS;i++){
-		//free_page((unsigned long)objects[i].stream_content);
-      kfree(objects[i].head->buffer);
-      kfree(objects[i].head);
-	}
+	   for(j=0;j<NUM_FLOW;j++){
+      
+         //free_page((unsigned long)objects[i].stream_content);
+         kfree(objects[i][j].head->buffer);
+         kfree(objects[i][j].head);
+      }     
+   }
 
 	unregister_chrdev(Major, DEVICE_NAME);
 

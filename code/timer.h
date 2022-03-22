@@ -29,20 +29,18 @@ static enum hrtimer_restart my_hrtimer_callback( struct hrtimer *timer ){
 
 static int blocking(unsigned long timeout){
 
-   unsigned long microsecs = timeout;
-
    control_record data;
    control_record* control;
    ktime_t ktime_interval;
    DECLARE_WAIT_QUEUE_HEAD(the_queue);//here we use a private queue - wakeup is selective via wake_up_process
 
-   if(microsecs == 0) return 0;
+   if(timeout == 0) return 0;
 
 	control = &data;//set the pointer to the current stack area
 
-   AUDIT printk("%s: thread %d going to usleep for %lu microsecs\n",MODNAME,current->pid,microsecs);
+   AUDIT printk("%s: thread %d going to usleep for %lu microsecs\n",MODNAME,current->pid,timeout);
 
-   ktime_interval = ktime_set( 0, microsecs*1000 );
+   ktime_interval = ktime_set( 0, timeout*1000 );
 
    control->task = current;
    control->pid  = current->pid;

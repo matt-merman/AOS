@@ -15,7 +15,7 @@
 
 char buff[4096];
 
-#define OUT_LEN 5
+#define OUT_LEN 16
 char out[OUT_LEN];
 
 void * get_setting(int fd, char * device){

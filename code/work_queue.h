@@ -17,10 +17,6 @@ typedef struct _object_state{
 	//int valid_bytes;
 	//char * stream_content;//the I/O node is a buffer in memory
         memory_node * head; //head to al written buffer 
-        bool priority; //priority level (high or low) for the operations
-        bool blocking; //blocking vs non-blocking read and write operations
-        unsigned long timeout; //setup of a timeout regulating the awake of blocking operations
-
 } object_state;
 
 typedef struct _packed_work{
