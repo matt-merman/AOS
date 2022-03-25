@@ -77,15 +77,14 @@ void * get_setting(int fd, char * device){
                 }
         }
         
-        close(fd);
+        //close(fd);
         return NULL;
 
 } 
 
-void * get_operation(char * device){
+void * get_operation(int fd, char * device){
 
         int input = 0;
-        int fd;
         int ret;
 
         while(input != 4){
@@ -93,12 +92,6 @@ void * get_operation(char * device){
                 printf("Choose operation:\n1. WRITE\n2. READ\n3. GO TO SETTINGS\n4. EXIT\n");
                 scanf("%d", &input);
                 
-                fd = open(device,O_RDWR);
-                if(fd == -1) {
-                        printf("open error on device %s\n",device);
-                        return NULL;
-                }
-
                 switch(input){
 
                         case 1:
@@ -109,6 +102,7 @@ void * get_operation(char * device){
                                 }else{
                                         printf("Written(%d Bytes): %s\n", ret, DATA);
                                 }
+                                //lseek(fd, 0, SEEK_SET);
                                 break;
                         case 2: 
                                 ret = read(fd,out,OUT_LEN);
@@ -118,6 +112,7 @@ void * get_operation(char * device){
                                         printf("Read(%d Bytes): %s\n", ret, out);
                                 }
                                 memset(out, 0, OUT_LEN);
+                                //lseek(fd, 0, SEEK_SET);
                                 break;
                         case 3:
                                 get_setting(fd, device);
@@ -127,9 +122,9 @@ void * get_operation(char * device){
                                 printf("Wrong input!\n");
                 }
 
-                close(fd);
         }
-
+        
+        close(fd);
         return NULL;
 }
 
@@ -168,7 +163,7 @@ int main(int argc, char** argv){
         }
 
         get_setting(fd, device);
-        get_operation(device);
+        get_operation(fd, device);
     
         return 0;
 }

@@ -1051,6 +1051,7 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
   include/uapi/linux/tty_flags.h \
   include/uapi/linux/tty.h \
   /home/mattia/Desktop/linux_device_driver/code/work_queue.h \
+  /home/mattia/Desktop/linux_device_driver/code/read.h \
 
 /home/mattia/Desktop/linux_device_driver/code/multi_flow.o: $(deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o)
 

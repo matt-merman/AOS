@@ -3,6 +3,7 @@ source file usleep.c
 */
 
 #include "info.h"
+#include <asm-generic/param.h>
 
 #define NO (0)
 #define YES (NO+1)
@@ -27,37 +28,41 @@ static enum hrtimer_restart my_hrtimer_callback( struct hrtimer *timer ){
         return HRTIMER_NORESTART;
 }
 
-static int blocking(unsigned long timeout){
+static int blocking(unsigned long timeout, struct mutex * mutex, wait_queue_head_t * wq){
 
    control_record data;
    control_record* control;
    ktime_t ktime_interval;
-   DECLARE_WAIT_QUEUE_HEAD(the_queue);//here we use a private queue - wakeup is selective via wake_up_process
-
+   
    if(timeout == 0) return 0;
 
 	control = &data;//set the pointer to the current stack area
 
    AUDIT printk("%s: thread %d going to usleep for %lu microsecs\n",MODNAME,current->pid,timeout);
 
-   ktime_interval = ktime_set( 0, timeout*1000 );
+   ktime_interval = ktime_set(0, timeout*1000);
 
    control->task = current;
    control->pid  = current->pid;
    control->awake = NO;
 
+   bool condition = mutex_trylock(mutex) == 1;
+   wait_event_timeout(*wq, condition, ktime_interval);
+
+/*
    hrtimer_init(&(control->hr_timer), CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
    control->hr_timer.function = &my_hrtimer_callback;
    hrtimer_start(&(control->hr_timer), ktime_interval, HRTIMER_MODE_REL);
 
-   wait_event_interruptible(the_queue, control->awake == YES);
+   wait_event_interruptible(wq, control->awake == YES);
 
    hrtimer_cancel(&(control->hr_timer));
    
    AUDIT printk("%s: thread %d exiting usleep\n",MODNAME, current->pid);
 
 	if(unlikely(control->awake != YES)) return -1;
+*/
 
    return 0;
 }

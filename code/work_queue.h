@@ -17,6 +17,7 @@ typedef struct _object_state{
 	//int valid_bytes;
 	//char * stream_content;//the I/O node is a buffer in memory
         memory_node * head; //head to al written buffer 
+        wait_queue_head_t wq;
 } object_state;
 
 typedef struct _packed_work{
@@ -45,7 +46,6 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
 
    //need to lock in any case
    mutex_lock(&(the_object->operation_synchronizer));
-
    /*      
    if(*off >= OBJECT_MAX_SIZE) {//offset too large
       mutex_unlock(&(the_object->operation_synchronizer));
@@ -61,6 +61,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
         AUDIT printk("%s: ALLOCATED a new memory node\n",MODNAME);
         if(node == NULL){
                 printk("%s: unable to allocate a new memory node\n",MODNAME);
+                mutex_unlock(&(the_object->operation_synchronizer));
                 return -1;
         }
 
@@ -68,6 +69,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
         AUDIT printk("%s: ALLOCATED %ld bytes\n",MODNAME, len);
         if(buffer == NULL){
                 printk("%s: unable to allocate memory\n",MODNAME);
+                mutex_unlock(&(the_object->operation_synchronizer));
                 return -1;
         }
         
@@ -84,7 +86,8 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len){
         //returns the number of bytes NOT copied                        
         ret = copy_from_user(current_node->buffer, buff, len);          
 
-   *off += (len - ret);
+   //*off += (len - ret);
+   *off = 0;
    //the_object->valid_bytes = *off;
    mutex_unlock(&(the_object->operation_synchronizer));
 
