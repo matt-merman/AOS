@@ -52,7 +52,7 @@ void *get_setting(int fd, char *device)
                 if (input == 5)
                 {
 
-                        printf("Insert a TIMEOUT for blocking operations\n");
+                        printf("Insert a TIMEOUT (microsecs) for blocking operations\n");
                         scanf("%lu", &timeout);
                         if (!timeout)
                         {

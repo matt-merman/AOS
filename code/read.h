@@ -31,14 +31,34 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
    return node;
 }
 
-int read(object_state *the_object, const char *buff, loff_t *off, size_t len)
+int read(object_state *the_object, const char *buff, loff_t *off, size_t len, session *session)
 {
 
-   int ret = 0, residual_bytes = len, lenght_buffer = 0;
+   int ret, residual_bytes = len, lenght_buffer = 0;
    memory_node *current_node, *last_node;
 
-   mutex_lock(&(the_object->operation_synchronizer));
+   wait_queue_head_t *wq;
+   wq = &the_object->wq;
 
+   // Try to acquire the mutex atomically.
+   // Returns 1 if the mutex has been acquired successfully,
+   // and 0 on contention.
+   ret = mutex_trylock(&(the_object->operation_synchronizer));
+   if (!ret)
+   {
+
+      printk("%s: unable to get lock now\n", MODNAME);
+      if (session->blocking == BLOCKING)
+      {
+
+         ret = blocking(session->timeout, &the_object->operation_synchronizer, wq);
+         if (ret == 0) return 0;
+      }
+      else
+         return 0;
+   }
+
+   ret = 0;
    lenght_buffer -= *off;
 
    current_node = the_object->head;
@@ -80,6 +100,7 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len)
    {
       *off += len - ret;
       mutex_unlock(&(the_object->operation_synchronizer));
+      wake_up(wq);
       return ret;
    }
 
@@ -112,6 +133,7 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len)
 
          *off += len - ret;
          mutex_unlock(&(the_object->operation_synchronizer));
+         wake_up(wq);
          return ret;
       }
 
@@ -121,6 +143,7 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len)
 
          mutex_unlock(&(the_object->operation_synchronizer));
          *off += len - ret;
+         wake_up(wq);
          return ret;
       }
    }
@@ -144,11 +167,13 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len)
       {
          mutex_unlock(&(the_object->operation_synchronizer));
          *off += len - ret;
+         wake_up(wq);
          return ret;
       }
    }
 
    *off += len - ret;
    mutex_unlock(&(the_object->operation_synchronizer));
+   wake_up(wq);
    return ret;
 }

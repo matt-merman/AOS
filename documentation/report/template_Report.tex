@@ -1,0 +1,44 @@
+\documentclass[12pt]{report}
+
+
+% Title Page
+\title{Multi-flow device file}
+\author{Di Battista Mattia}
+\date{23 03 2022}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+\chapter*{Specification}
+
+This specification is related to a Linux device driver implementing low and high priority flows of data.
+Through an open session to the device file a thread can read/write data segments. The data delivery
+follows a First-in-First-out policy along each of the two different data flows (low and high priority). After
+read operations, the read data disappear from the flow. Also, the high priority data flow must offer
+synchronous write operations while the low priority data flow must offer an asynchronous execution
+(based on delayed work) of write operations, while still keeping the interface able to synchronously notify
+the outcome. Read operations are all executed synchronously. The device driver should support 128
+devices corresponding to the same amount of minor numbers.
+
+The device driver should implement the support for the \emph{ioctl(..)} service in order to manage the I/O session
+as follows:
+\begin{itemize}
+\item setup of the priority level (high or low) for the operations
+\item blocking vs non-blocking read and write operations
+\item setup of a timeout regulating the awake of blocking operations
+\end{itemize}
+
+A few Linux module parameters and functions should be implemented in order to enable or disable the
+device file, in terms of a specific minor number. If it is disabled, any attempt to open a session should fail
+(but already open sessions will be still managed). Further additional parameters exposed via VFS should
+provide a picture of the current state of the device according to the following information:
+\begin{itemize}
+\item enabled or disabled
+\item number of bytes currently present in the two flows (high vs low priority)
+\item number of threads currently waiting for data along the two flows (high vs low priority)
+\end{itemize}
+
+\chapter*{title}
+\end{document}          

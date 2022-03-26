@@ -32,27 +32,26 @@ __used __section(__versions) = {
 	{ 0x754d539c, "strlen" },
 	{ 0xb44ad4b3, "_copy_to_user" },
 	{ 0x9166fada, "strncpy" },
-	{ 0x3eeb2322, "__wake_up" },
 	{ 0xc5b6f236, "queue_work_on" },
 	{ 0x2d3385d3, "system_wq" },
 	{ 0x1937241e, "try_module_get" },
-	{ 0x3ba859c1, "module_put" },
-	{ 0x7a2af7b4, "cpu_number" },
 	{ 0x362ef408, "_copy_from_user" },
 	{ 0x88db9f48, "__check_object_size" },
+	{ 0x3eeb2322, "__wake_up" },
 	{ 0x409bcb62, "mutex_unlock" },
 	{ 0xeb233a45, "__kmalloc" },
-	{ 0x2ab7989d, "mutex_lock" },
 	{ 0xdecd0b29, "__stack_chk_fail" },
 	{ 0x92540fbf, "finish_wait" },
 	{ 0x8ddd8aad, "schedule_timeout" },
 	{ 0x8c26d495, "prepare_to_wait_event" },
 	{ 0xfe487975, "init_wait_entry" },
-	{ 0xa1c76e0a, "_cond_resched" },
 	{ 0xf21017d9, "mutex_trylock" },
-	{ 0x1b44c663, "current_task" },
+	{ 0xa1c76e0a, "_cond_resched" },
 	{ 0xf5cb25c8, "kmem_cache_alloc_trace" },
 	{ 0x35216b26, "kmalloc_caches" },
+	{ 0x3ba859c1, "module_put" },
+	{ 0x7a2af7b4, "cpu_number" },
+	{ 0x1b44c663, "current_task" },
 	{ 0x37a0cba, "kfree" },
 	{ 0xc5850110, "printk" },
 	{ 0xbdfb6dbb, "__fentry__" },
@@ -61,4 +60,4 @@ __used __section(__versions) = {
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "AA7C18323E38B3C44807E3B");
+MODULE_INFO(srcversion, "C8E461E9BBD95F3B60DCD1F");

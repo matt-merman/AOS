@@ -29,3 +29,8 @@ MODULE_DESCRIPTION("basic example usage of kernel work queues");
 #define AUDIT if(1)
 
 #define NUM_FLOW 2
+
+#define LOW_PRIORITY 0
+#define HIGH_PRIORITY 1
+#define BLOCKING 0
+#define NON_BLOCKING 1

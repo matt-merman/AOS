@@ -18,11 +18,6 @@ static int Major; /* Major number assigned to broadcast device driver */
 #define get_minor(session) MINOR(session->f_dentry->d_inode->i_rdev)
 #endif
 
-#define LOW_PRIORITY 0
-#define HIGH_PRIORITY 1
-#define BLOCKING 0
-#define NON_BLOCKING 1
-
 #ifdef SINGLE_INSTANCE
 static DEFINE_MUTEX(device_state);
 #endif
@@ -84,7 +79,7 @@ static int dev_release(struct inode *inode, struct file *file)
 {
 
    session *session = file->private_data;
- int minor = get_minor(file);
+   int minor = get_minor(file);
 
 #ifdef SINGLE_SESSION_OBJECT
    mutex_unlock(&(objects[minor].object_busy));
@@ -128,49 +123,41 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
    {
 
       priority_obj = &the_object[HIGH_PRIORITY];
-      wq = &priority_obj->wq;
 
       if (session->blocking == BLOCKING)
       {
-
-         blocking(session->timeout, &priority_obj->operation_synchronizer, wq);
          AUDIT printk("%s: somebody called a BLOCKING HIGH-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
       }
       else
+      {
          AUDIT printk("%s: somebody called a NON-BLOCKING HIGH-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+      }
 
-      ret = write(priority_obj, buff, off, len);
-      wake_up(wq);
+      ret = write(priority_obj, buff, off, len, session);
    }
    else
    {
 
       priority_obj = &the_object[LOW_PRIORITY];
+      wq = &priority_obj->wq;
 
       if (session->blocking == BLOCKING)
       {
-
-         //...
          AUDIT printk("%s: somebody called a BLOCKING LOW-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         ret = write(priority_obj, buff, off, len, session);
       }
       else
       {
-
-         //...
+         ret = put_work(filp, buff, len, off, priority_obj);
+         if (ret != 0)
+         {
+            printk("%s: Error on NON-BLOCKING LOW-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+            return -1;
+         }
+         ret = len - ret; //(*)
          AUDIT printk("%s: somebody called a NON-BLOCKING LOW-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         wake_up(wq);
       }
-
-      ret = put_work(filp, buff, len, off, priority_obj);
-      if (ret != 0)
-      {
-
-         printk("%s: Error on NON-BLOCKING LOW priority write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
-         return -1;
-      }
-
-      ret = len - ret; //(*)
-      wq = &priority_obj->wq;
-      wake_up(wq);
    }
 
    return ret; //(*)
@@ -179,47 +166,43 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
 {
 
-     wait_queue_head_t *wq;
+   wait_queue_head_t *wq;
    object_state *priority_obj;
    int ret;
    int minor = get_minor(filp);
    object_state *the_object = objects[minor];
    session *session = filp->private_data;
- 
+
    if (session->priority == HIGH_PRIORITY)
    {
 
       priority_obj = &the_object[HIGH_PRIORITY];
       wq = &priority_obj->wq;
-      
+
       if (session->blocking == BLOCKING)
       {
-         blocking(session->timeout, &priority_obj->operation_synchronizer, wq);
          AUDIT printk("%s: somebody called a BLOCKING HIGH-PRIORITY read on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
       }
       else
          AUDIT printk("%s: somebody called a NON-BLOCKING HIGH-PRIORITY read on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
 
-      ret = read(priority_obj, buff, off, len);
-      wake_up(wq);
+      ret = read(priority_obj, buff, off, len, session);
    }
    else
    {
 
       priority_obj = &the_object[LOW_PRIORITY];
       wq = &priority_obj->wq;
-      // TO-DO: put_work()
-
+   
       if (session->blocking == BLOCKING)
       {
-         blocking(session->timeout, &priority_obj->operation_synchronizer, wq);
          AUDIT printk("%s: somebody called a BLOCKING LOW-PRIORITY read on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         ret = read(priority_obj, buff, off, len, session);
       }
       else
          AUDIT printk("%s: somebody called a NON-BLOCKING LOW-PRIORITY read on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
-
-      ret = read(priority_obj, buff, off, len);
-      wake_up(wq);
+         //TO-DO: put_work()
+         //...
    }
 
    return ret;
@@ -290,7 +273,7 @@ int init_module(void)
       {
 
          mutex_init(&(objects[i][j].operation_synchronizer));
-         
+
          // reserve memory to write op.
          objects[i][j].head = kmalloc(sizeof(memory_node), GFP_KERNEL);
          if (objects[i][j].head == NULL)
@@ -303,7 +286,6 @@ int init_module(void)
          objects[i][j].head->buffer = NULL;
 
          init_waitqueue_head(&objects[i][j].wq);
-
       }
    }
 
