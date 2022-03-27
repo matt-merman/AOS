@@ -41,31 +41,52 @@ typedef struct _session
 
 } session;
 
-int write(object_state *the_object, const char *buff, loff_t *off, size_t len, session * session)
+int write(object_state *the_object, const char *buff, loff_t *off, size_t len, session *session)
 {
 
         memory_node *node, *current_node;
         char *buffer;
         int ret;
-        
+
         wait_queue_head_t *wq;
         wq = &the_object->wq;
-        
-        //Try to acquire the mutex atomically. 
-        //Returns 1 if the mutex has been acquired successfully, 
-        //and 0 on contention.
-        ret = mutex_trylock(&(the_object->operation_synchronizer));
-        if (!ret){
 
-                printk("%s: unable to get lock now\n", MODNAME);
-                if(session->blocking == BLOCKING){
+        // TO TEST
+        /*
+        if (session->blocking == BLOCKING)
+                {
 
                         ret = blocking(session->timeout, &the_object->operation_synchronizer, wq);
-                        if (ret == 0) return 0;
-                        
-                }else return 0;
+                        if (ret == 0)
+                                return 0;
+                        goto here;
+                }
 
+        ret = mutex_trylock(&(the_object->operation_synchronizer));
+        while(1)
+        */
+
+        // Try to acquire the mutex atomically.
+        // Returns 1 if the mutex has been acquired successfully,
+        // and 0 on contention.
+
+        ret = mutex_trylock(&(the_object->operation_synchronizer));
+        if (!ret)
+        {
+
+                printk("%s: unable to get lock now\n", MODNAME);
+                if (session->blocking == BLOCKING)
+                {
+
+                        ret = blocking(session->timeout, &the_object->operation_synchronizer, wq);
+                        if (ret == 0)
+                                return 0;
+                }
+                else
+                        return 0;
         }
+
+        // here:
 
         node = kmalloc(sizeof(memory_node), GFP_KERNEL);
         buffer = kmalloc(len, GFP_KERNEL);
@@ -76,10 +97,10 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len, s
                 wake_up(wq);
                 return -1;
         }
-        
+
         AUDIT printk("%s: ALLOCATED a new memory node\n", MODNAME);
         AUDIT printk("%s: ALLOCATED %ld bytes\n", MODNAME, len);
-        
+
         current_node = the_object->head;
 
         while (current_node->next != NULL)
@@ -98,7 +119,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len, s
         *off = 0;
         // the_object->valid_bytes = *off;
         mutex_unlock(&(the_object->operation_synchronizer));
-        
+
         wake_up(wq);
 
         return len - ret;
@@ -114,7 +135,7 @@ void delayed_write(unsigned long data)
 
         AUDIT printk("%s: this print comes from kworker daemon with PID=%d - running on CPU-core %d\n", MODNAME, current->pid, smp_processor_id());
 
-        //write(the_object, buff, off, len);
+        // write(the_object, buff, off, len);
 
         AUDIT printk("%s: releasing the task buffer at address %p - container of task is at %p\n", MODNAME, (void *)data, container_of((void *)data, packed_work, the_work));
 

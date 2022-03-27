@@ -4,8 +4,12 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 {
 
    int dim = lenght - offset;
-
+   
+   printk("-------------HERE1 (%d)-(%d)-------------\n", lenght, offset);
+   
    char *remaning_buff = kmalloc(dim, GFP_KERNEL);
+
+   printk("-------------HERE2 (%d)-(%d)-------------\n", lenght, offset);
 
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (remaning_buff == NULL)
@@ -59,7 +63,7 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
    }
 
    ret = 0;
-   lenght_buffer -= *off;
+   //lenght_buffer -= *off;
 
    current_node = the_object->head;
    // PHASE 1: READING
@@ -98,14 +102,16 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
 
    if (current_node->buffer == NULL)
    {
-      *off += len - ret;
+      //*off += len - ret;
       mutex_unlock(&(the_object->operation_synchronizer));
       wake_up(wq);
       return ret;
    }
 
    lenght_buffer = strlen(current_node->buffer);
-   lenght_buffer -= *off;
+   
+   //lenght_buffer -= *off;
+   
    if (len > lenght_buffer)
    {
 
@@ -131,7 +137,7 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
          else if (last_node->buffer == NULL)
             the_object->head = last_node;
 
-         *off += len - ret;
+         //*off += len - ret;
          mutex_unlock(&(the_object->operation_synchronizer));
          wake_up(wq);
          return ret;
@@ -142,7 +148,7 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
       {
 
          mutex_unlock(&(the_object->operation_synchronizer));
-         *off += len - ret;
+         //*off += len - ret;
          wake_up(wq);
          return ret;
       }
@@ -166,13 +172,13 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
       if (current_node == NULL)
       {
          mutex_unlock(&(the_object->operation_synchronizer));
-         *off += len - ret;
+         //*off += len - ret;
          wake_up(wq);
          return ret;
       }
    }
 
-   *off += len - ret;
+   //*off += len - ret;
    mutex_unlock(&(the_object->operation_synchronizer));
    wake_up(wq);
    return ret;
