@@ -23,6 +23,8 @@ MODULE_DESCRIPTION("Multi-flow device file");
 
 #define MODNAME "MULTI-FLOW"
 
+#define DEVICE_NAME "test" /* Device file name in /dev/ - not mandatory  */
+
 //#define OBJECT_MAX_SIZE  (4096) //just one page
 #define MINORS 128
 #define AUDIT if (1)
@@ -41,7 +43,7 @@ MODULE_DESCRIPTION("Multi-flow device file");
 #define _INFOH_
 
 static bool enabled_device[MINORS];
-module_param_array(enabled_device, bool, NULL, 0644);
+module_param_array(enabled_device, bool, NULL, 0744);
 MODULE_PARM_DESC(enabled_device, "Module parameter is implemented in order to enable or disable " \
 "the device file, in terms of a specific minor number. If it is disabled, " \
 "any attempt to open a session should fail (but already open sessions will be still managed).");

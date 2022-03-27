@@ -137,8 +137,6 @@ void *get_operation(int fd, char *device)
 
 int main(int argc, char **argv)
 {       
-        ///sys/module/multi_flow/parameter
-
         int ret, major, i;
         char *path;
 
