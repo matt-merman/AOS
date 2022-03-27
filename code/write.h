@@ -1,26 +1,8 @@
-#include "info.h"
+#include "common.h"
 
-//#define SINGLE_INSTANCE //just one session at a time across all I/O node
-//#define SINGLE_SESSION_OBJECT //just one session per I/O node at a time
-
-// linked list used in write op.
-typedef struct _memory_node
-{
-        char *buffer;
-        struct _memory_node *next;
-} memory_node;
-
-typedef struct _object_state
-{
-#ifdef SINGLE_SESSION_OBJECT
-        struct mutex object_busy;
-#endif
-        struct mutex operation_synchronizer;
-        // int valid_bytes;
-        // char * stream_content;//the I/O node is a buffer in memory
-        memory_node *head; // head to al written buffer
-        wait_queue_head_t wq;
-} object_state;
+int write(object_state *, const char *, loff_t *, size_t, session *);
+void delayed_write(unsigned long);
+long put_work(struct file *, const char *, size_t, loff_t *, object_state *, session *);
 
 typedef struct _packed_work
 {
@@ -30,16 +12,8 @@ typedef struct _packed_work
         size_t len;
         loff_t *off;
         object_state *the_object;
+        session * session;
 } packed_work;
-
-typedef struct _session
-{
-
-        bool priority;         // priority level (high or low) for the operations
-        bool blocking;         // blocking vs non-blocking read and write operations
-        unsigned long timeout; // setup of a timeout regulating the awake of blocking operations
-
-} session;
 
 int write(object_state *the_object, const char *buff, loff_t *off, size_t len, session *session)
 {
@@ -47,11 +21,10 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len, s
         memory_node *node, *current_node;
         char *buffer;
         int ret;
-
         wait_queue_head_t *wq;
-        wq = &the_object->wq;
-
+        
         // TO TEST
+        //wq = &the_object->wq;
         /*
         if (session->blocking == BLOCKING)
                 {
@@ -66,25 +39,8 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len, s
         while(1)
         */
 
-        // Try to acquire the mutex atomically.
-        // Returns 1 if the mutex has been acquired successfully,
-        // and 0 on contention.
-
-        ret = mutex_trylock(&(the_object->operation_synchronizer));
-        if (!ret)
-        {
-
-                printk("%s: unable to get lock now\n", MODNAME);
-                if (session->blocking == BLOCKING)
-                {
-
-                        ret = blocking(session->timeout, &the_object->operation_synchronizer, wq);
-                        if (ret == 0)
-                                return 0;
-                }
-                else
-                        return 0;
-        }
+        wq = get_lock(the_object, session);
+        if(wq == NULL) return 0;
 
         // here:
 
@@ -127,6 +83,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len, s
 
 void delayed_write(unsigned long data)
 {
+        session *session = container_of((void *)data, packed_work, the_work)->session;
 
         size_t len = container_of((void *)data, packed_work, the_work)->len;
         loff_t *off = container_of((void *)data, packed_work, the_work)->off;
@@ -135,7 +92,7 @@ void delayed_write(unsigned long data)
 
         AUDIT printk("%s: this print comes from kworker daemon with PID=%d - running on CPU-core %d\n", MODNAME, current->pid, smp_processor_id());
 
-        // write(the_object, buff, off, len);
+        write(the_object, buff, off, len, session);
 
         AUDIT printk("%s: releasing the task buffer at address %p - container of task is at %p\n", MODNAME, (void *)data, container_of((void *)data, packed_work, the_work));
 
@@ -144,7 +101,7 @@ void delayed_write(unsigned long data)
         module_put(THIS_MODULE);
 }
 
-long put_work(struct file *filp, const char *buff, size_t len, loff_t *off, object_state *the_object)
+long put_work(struct file *filp, const char *buff, size_t len, loff_t *off, object_state *the_object, session * session)
 {
 
         packed_work *the_task;
@@ -168,11 +125,12 @@ long put_work(struct file *filp, const char *buff, size_t len, loff_t *off, obje
         the_task->len = len;
         the_task->off = off;
         the_task->the_object = the_object;
+        the_task->session = session;
 
         AUDIT printk("%s: work buffer allocation success - address is %p\n", MODNAME, the_task);
 
         __INIT_WORK(&(the_task->the_work), (void *)delayed_write, (unsigned long)(&(the_task->the_work)));
-
+        
         schedule_work(&the_task->the_work);
 
         return 0;

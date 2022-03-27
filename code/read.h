@@ -1,15 +1,14 @@
-#include "info.h"
+#include "common.h"
+
+memory_node *shift_buffer(int, int, memory_node *);
+int read(object_state *, const char *, loff_t *, size_t, session *);
 
 memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 {
 
    int dim = lenght - offset;
    
-   printk("-------------HERE1 (%d)-(%d)-------------\n", lenght, offset);
-   
    char *remaning_buff = kmalloc(dim, GFP_KERNEL);
-
-   printk("-------------HERE2 (%d)-(%d)-------------\n", lenght, offset);
 
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (remaning_buff == NULL)
@@ -38,31 +37,13 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 int read(object_state *the_object, const char *buff, loff_t *off, size_t len, session *session)
 {
 
-   int ret, residual_bytes = len, lenght_buffer = 0;
+   int ret = 0, residual_bytes = len, lenght_buffer = 0;
    memory_node *current_node, *last_node;
-
    wait_queue_head_t *wq;
-   wq = &the_object->wq;
+ 
+   wq = get_lock(the_object, session);
+   if(!wq) return 0;
 
-   // Try to acquire the mutex atomically.
-   // Returns 1 if the mutex has been acquired successfully,
-   // and 0 on contention.
-   ret = mutex_trylock(&(the_object->operation_synchronizer));
-   if (!ret)
-   {
-
-      printk("%s: unable to get lock now\n", MODNAME);
-      if (session->blocking == BLOCKING)
-      {
-
-         ret = blocking(session->timeout, &the_object->operation_synchronizer, wq);
-         if (ret == 0) return 0;
-      }
-      else
-         return 0;
-   }
-
-   ret = 0;
    //lenght_buffer -= *off;
 
    current_node = the_object->head;

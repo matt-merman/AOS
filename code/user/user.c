@@ -11,7 +11,7 @@
 #define DATA "123456789\n"
 #define SIZE strlen(DATA)
 #define OUT_LEN 16
-#define MINORS 1
+#define MINORS 128
 
 char buff[4096];
 char out[OUT_LEN];
@@ -93,14 +93,13 @@ void *get_operation(int fd, char *device)
         while (input != 4)
         {
 
-                printf("Choose operation:\n1. WRITE\n2. READ\n3. GO TO SETTINGS\n4. EXIT\n");
+                printf("\nChoose operation:\n1. WRITE\n2. READ\n3. GO TO SETTINGS\n4. EXIT\n\n");
                 scanf("%d", &input);
 
                 switch (input)
                 {
 
                 case 1:
-                        printf("%ld\n", SIZE);
                         ret = write(fd, DATA, SIZE);
                         if (ret == -1)
                         {
@@ -108,7 +107,7 @@ void *get_operation(int fd, char *device)
                         }
                         else
                         {
-                                printf("Written(%d Bytes): %s\n", ret, DATA);
+                                printf("Written %d Bytes, from user: '%s'\n", ret, DATA);
                         }
                         break;
                 case 2:
@@ -153,7 +152,7 @@ int main(int argc, char **argv)
 
         system("clear");
         printf("**************************************\n");
-        printf("**             WELCOME              **\n");
+        printf("**      Multi-flow device file      **\n");
         printf("**************************************\n");
 
         for (i = 0; i < MINORS; i++)

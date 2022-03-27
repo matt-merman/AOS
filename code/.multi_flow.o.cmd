@@ -17,7 +17,6 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
     $(wildcard include/config/arm64.h) \
     $(wildcard include/config/retpoline.h) \
     $(wildcard include/config/arch/use/builtin/bswap.h) \
-  /home/mattia/Desktop/linux_device_driver/code/timer.h \
   /home/mattia/Desktop/linux_device_driver/code/info.h \
   include/linux/module.h \
     $(wildcard include/config/modules.h) \
@@ -1050,8 +1049,9 @@ deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o := \
   include/linux/tty_ldisc.h \
   include/uapi/linux/tty_flags.h \
   include/uapi/linux/tty.h \
-  /home/mattia/Desktop/linux_device_driver/code/work_queue.h \
   /home/mattia/Desktop/linux_device_driver/code/read.h \
+  /home/mattia/Desktop/linux_device_driver/code/common.h \
+  /home/mattia/Desktop/linux_device_driver/code/write.h \
 
 /home/mattia/Desktop/linux_device_driver/code/multi_flow.o: $(deps_/home/mattia/Desktop/linux_device_driver/code/multi_flow.o)
 
