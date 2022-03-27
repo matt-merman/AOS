@@ -115,11 +115,13 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
       priority_obj = &the_object[HIGH_PRIORITY];
 
       AUDIT if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING HIGH-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a BLOCKING HIGH-PRIORITY write on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
       else 
-         printk("%s: somebody called a NON-BLOCKING HIGH-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a NON-BLOCKING HIGH-PRIORITY write on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
 
-      ret = write(priority_obj, buff, off, len, session);
+      ret = write(priority_obj, buff, off, len, session, minor);
    }
    else
    {
@@ -127,14 +129,17 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
       priority_obj = &the_object[LOW_PRIORITY];
 
       AUDIT if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING LOW-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a BLOCKING LOW-PRIORITY write on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
       else 
-         printk("%s: somebody called a NON-BLOCKING LOW-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a NON-BLOCKING LOW-PRIORITY write on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
 
-      ret = put_work(filp, buff, len, off, priority_obj, session);
+      ret = put_work(filp, buff, len, off, priority_obj, session, minor);
       if (ret != 0)
       {
-         printk("%s: Error on LOW-PRIORITY write on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: Error on LOW-PRIORITY write on dev with [major,minor] number "\
+         "[%d,%d]\n", MODNAME, get_major(filp), minor);
          return -1;
       }
       ret = len;
@@ -158,9 +163,15 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
       priority_obj = &the_object[HIGH_PRIORITY];
 
       AUDIT if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING read on HIGH-PRIORITY flow on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a BLOCKING read on HIGH-PRIORITY flow on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
+      
+      //TO-DO
+      //...
+      
       else 
-         printk("%s: somebody called a NON-BLOCKING read on HIGH-PRIORITY flow on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a NON-BLOCKING read on HIGH-PRIORITY flow on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
    }
    else
    {
@@ -168,12 +179,18 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
       priority_obj = &the_object[LOW_PRIORITY];
 
       AUDIT if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING read on LOW-PRIORITY flow on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a BLOCKING read on LOW-PRIORITY flow on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
+      
+      //TO-DO
+      //...
+
       else 
-         printk("%s: somebody called a NON-BLOCKING read on LOW-PRIORITY flow on dev with [major,minor] number [%d,%d]\n", MODNAME, get_major(filp), get_minor(filp));
+         printk("%s: somebody called a NON-BLOCKING read on LOW-PRIORITY flow on dev with " \
+         "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
    }
 
-   ret = read(priority_obj, buff, off, len, session);
+   ret = read(priority_obj, buff, off, len, session, minor);
 
    return ret;
 }
@@ -196,26 +213,32 @@ static long dev_ioctl(struct file *filp, unsigned int command, unsigned long par
    {
    case 3:
       session->priority = LOW_PRIORITY;
-      AUDIT printk("%s: somebody has set priority level to LOW on dev with [major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
+      AUDIT printk("%s: somebody has set priority level to LOW on dev with " \
+      "[major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
       break;
    case 4:
       session->priority = HIGH_PRIORITY;
-      AUDIT printk("%s: somebody has set priority level to HIGH on dev with [major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
+      AUDIT printk("%s: somebody has set priority level to HIGH on dev with " \
+      "[major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
       break;
    case 5:
       session->blocking = BLOCKING;
-      AUDIT printk("%s: somebody has set BLOCKING r/w op on dev with [major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
+      AUDIT printk("%s: somebody has set BLOCKING r/w op on dev with " \
+      "[major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
       break;
    case 6:
       session->blocking = NON_BLOCKING;
-      AUDIT printk("%s: somebody has set NON-BLOCKING r/w on dev with [major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
+      AUDIT printk("%s: somebody has set NON-BLOCKING r/w on dev with " \
+      "[major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
       break;
    case 7:
       session->timeout = param;
-      AUDIT printk("%s: somebody has set TIMEOUT on dev with [major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
+      AUDIT printk("%s: somebody has set TIMEOUT on dev with " \
+      "[major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
       break;
    default:
-      AUDIT printk("%s: somebody called an invalid setting on dev with [major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
+      AUDIT printk("%s: somebody called an invalid setting on dev with " \
+      "[major,minor] number [%d,%d] and command %u \n", MODNAME, get_major(filp), get_minor(filp), command);
    }
    return 0;
 }

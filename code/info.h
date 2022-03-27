@@ -11,10 +11,11 @@
 #include <linux/sched.h>
 #include <linux/version.h>
 #include <linux/time.h>
-#include <linux/string.h>	
+#include <linux/string.h>
 #include <linux/errno.h>
-#include <linux/tty.h>		/* For the tty declarations */
-#include <linux/version.h>	/* For LINUX_VERSION_CODE */
+#include <linux/tty.h>     /* For the tty declarations */
+#include <linux/version.h> /* For LINUX_VERSION_CODE */
+#include <linux/moduleparam.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mattia Di Battista");
@@ -22,11 +23,9 @@ MODULE_DESCRIPTION("Multi-flow device file");
 
 #define MODNAME "MULTI-FLOW"
 
-#define DEVICE_NAME "my-new-dev"  /* Device file name in /dev/ - not mandatory  */
-
 //#define OBJECT_MAX_SIZE  (4096) //just one page
 #define MINORS 128
-#define AUDIT if(1)
+#define AUDIT if (1)
 
 #define NUM_FLOW 2
 
@@ -40,6 +39,28 @@ MODULE_DESCRIPTION("Multi-flow device file");
 
 #ifndef _INFOH_
 #define _INFOH_
+
+static bool enabled_device[MINORS];
+module_param_array(enabled_device, bool, NULL, 0644);
+MODULE_PARM_DESC(enabled_device, "Module parameter is implemented in order to enable or disable " \
+"the device file, in terms of a specific minor number. If it is disabled, " \
+"any attempt to open a session should fail (but already open sessions will be still managed).");
+
+static int hp_bytes[MINORS];
+module_param_array(hp_bytes, int, NULL, 0744);
+MODULE_PARM_DESC(hp_bytes, "Number of bytes currently present in the high priority flow.");
+
+static int lp_bytes[MINORS];
+module_param_array(lp_bytes, int, NULL, 0744);
+MODULE_PARM_DESC(lp_bytes, "Number of bytes currently present in the low priority flow.");
+
+static int hp_threads[MINORS];
+module_param_array(hp_threads, int, NULL, 0744);
+MODULE_PARM_DESC(hp_threads, "Number of threads currently waiting for data along the high priority flow.");
+
+static int lp_threads[MINORS];
+module_param_array(lp_threads, int, NULL, 0744);
+MODULE_PARM_DESC(lp_threads, "Number of threads currently waiting for data along the low priority flow.");
 
 typedef struct _memory_node
 {

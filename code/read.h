@@ -1,7 +1,7 @@
 #include "common.h"
 
 memory_node *shift_buffer(int, int, memory_node *);
-int read(object_state *, const char *, loff_t *, size_t, session *);
+int read(object_state *, const char *, loff_t *, size_t, session *, int);
 
 memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 {
@@ -34,7 +34,12 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
    return node;
 }
 
-int read(object_state *the_object, const char *buff, loff_t *off, size_t len, session *session)
+int read(object_state *the_object, 
+   const char *buff, 
+   loff_t *off, 
+   size_t len, 
+   session *session,
+   int minor)
 {
 
    int ret = 0, residual_bytes = len, lenght_buffer = 0;
@@ -84,6 +89,9 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
    if (current_node->buffer == NULL)
    {
       //*off += len - ret;
+      if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
+      else lp_bytes[minor] -= ret;
+
       mutex_unlock(&(the_object->operation_synchronizer));
       wake_up(wq);
       return ret;
@@ -119,6 +127,9 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
             the_object->head = last_node;
 
          //*off += len - ret;
+         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
+         else lp_bytes[minor] -= ret;
+         
          mutex_unlock(&(the_object->operation_synchronizer));
          wake_up(wq);
          return ret;
@@ -128,6 +139,9 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
       if (the_object->head == NULL)
       {
 
+         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
+         else lp_bytes[minor] -= ret;
+         
          mutex_unlock(&(the_object->operation_synchronizer));
          //*off += len - ret;
          wake_up(wq);
@@ -152,6 +166,9 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
       current_node = shift_buffer(lenght_buffer, len, current_node);
       if (current_node == NULL)
       {
+         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
+         else lp_bytes[minor] -= ret;
+         
          mutex_unlock(&(the_object->operation_synchronizer));
          //*off += len - ret;
          wake_up(wq);
@@ -160,6 +177,10 @@ int read(object_state *the_object, const char *buff, loff_t *off, size_t len, se
    }
 
    //*off += len - ret;
+
+   if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
+   else lp_bytes[minor] -= ret;
+
    mutex_unlock(&(the_object->operation_synchronizer));
    wake_up(wq);
    return ret;

@@ -1,8 +1,8 @@
 #include "common.h"
 
-int write(object_state *, const char *, loff_t *, size_t, session *);
+int write(object_state *, const char *, loff_t *, size_t, session *, int);
 void delayed_write(unsigned long);
-long put_work(struct file *, const char *, size_t, loff_t *, object_state *, session *);
+long put_work(struct file *, const char *, size_t, loff_t *, object_state *, session *, int);
 
 typedef struct _packed_work
 {
@@ -12,19 +12,25 @@ typedef struct _packed_work
         size_t len;
         loff_t *off;
         object_state *the_object;
-        session * session;
+        session *session;
+        int minor;
 } packed_work;
 
-int write(object_state *the_object, const char *buff, loff_t *off, size_t len, session *session)
+int write(object_state *the_object,
+          const char *buff,
+          loff_t *off, 
+          size_t len, 
+          session *session,
+          int minor)
 {
 
         memory_node *node, *current_node;
         char *buffer;
         int ret;
         wait_queue_head_t *wq;
-        
+
         // TO TEST
-        //wq = &the_object->wq;
+        // wq = &the_object->wq;
         /*
         if (session->blocking == BLOCKING)
                 {
@@ -40,9 +46,13 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len, s
         */
 
         wq = get_lock(the_object, session);
-        if(wq == NULL) return 0;
+        if (wq == NULL)
+                return 0;
 
         // here:
+
+        if(session->priority == HIGH_PRIORITY) hp_bytes[minor] += len;
+        else lp_bytes[minor] += len;
 
         node = kmalloc(sizeof(memory_node), GFP_KERNEL);
         buffer = kmalloc(len, GFP_KERNEL);
@@ -84,6 +94,7 @@ int write(object_state *the_object, const char *buff, loff_t *off, size_t len, s
 void delayed_write(unsigned long data)
 {
         session *session = container_of((void *)data, packed_work, the_work)->session;
+        int minor = container_of((void *)data, packed_work, the_work)->minor;
 
         size_t len = container_of((void *)data, packed_work, the_work)->len;
         loff_t *off = container_of((void *)data, packed_work, the_work)->off;
@@ -92,7 +103,7 @@ void delayed_write(unsigned long data)
 
         AUDIT printk("%s: this print comes from kworker daemon with PID=%d - running on CPU-core %d\n", MODNAME, current->pid, smp_processor_id());
 
-        write(the_object, buff, off, len, session);
+        write(the_object, buff, off, len, session, minor);
 
         AUDIT printk("%s: releasing the task buffer at address %p - container of task is at %p\n", MODNAME, (void *)data, container_of((void *)data, packed_work, the_work));
 
@@ -101,7 +112,13 @@ void delayed_write(unsigned long data)
         module_put(THIS_MODULE);
 }
 
-long put_work(struct file *filp, const char *buff, size_t len, loff_t *off, object_state *the_object, session * session)
+long put_work(struct file *filp,
+              const char *buff,
+              size_t len,
+              loff_t *off,
+              object_state *the_object,
+              session *session,
+              int minor)
 {
 
         packed_work *the_task;
@@ -126,11 +143,13 @@ long put_work(struct file *filp, const char *buff, size_t len, loff_t *off, obje
         the_task->off = off;
         the_task->the_object = the_object;
         the_task->session = session;
+        the_task->minor = minor;
+
 
         AUDIT printk("%s: work buffer allocation success - address is %p\n", MODNAME, the_task);
 
         __INIT_WORK(&(the_task->the_work), (void *)delayed_write, (unsigned long)(&(the_task->the_work)));
-        
+
         schedule_work(&the_task->the_work);
 
         return 0;
