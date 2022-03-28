@@ -46,8 +46,9 @@ int read(object_state *the_object,
    memory_node *current_node, *last_node;
    wait_queue_head_t *wq;
  
-   wq = get_lock(the_object, session);
-   if(!wq) return 0;
+   wq = get_lock(the_object, session, minor);
+   if (wq == NULL) return 0;
+
 
    //lenght_buffer -= *off;
 
@@ -183,5 +184,6 @@ int read(object_state *the_object,
 
    mutex_unlock(&(the_object->operation_synchronizer));
    wake_up(wq);
+   
    return ret;
 }

@@ -28,28 +28,9 @@ int write(object_state *the_object,
         char *buffer;
         int ret;
         wait_queue_head_t *wq;
-
-        // TO TEST
-        // wq = &the_object->wq;
-        /*
-        if (session->blocking == BLOCKING)
-                {
-
-                        ret = blocking(session->timeout, &the_object->operation_synchronizer, wq);
-                        if (ret == 0)
-                                return 0;
-                        goto here;
-                }
-
-        ret = mutex_trylock(&(the_object->operation_synchronizer));
-        while(1)
-        */
-
-        wq = get_lock(the_object, session);
-        if (wq == NULL)
-                return 0;
-
-        // here:
+        
+        wq = get_lock(the_object, session, minor);
+        if (wq == NULL) return 0;
 
         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] += len;
         else lp_bytes[minor] += len;
@@ -84,8 +65,9 @@ int write(object_state *the_object,
         //*off += (len - ret);
         *off = 0;
         // the_object->valid_bytes = *off;
-        mutex_unlock(&(the_object->operation_synchronizer));
 
+        //TEST blocking      
+        mutex_unlock(&(the_object->operation_synchronizer));
         wake_up(wq);
 
         return len - ret;

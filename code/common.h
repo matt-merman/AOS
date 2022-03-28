@@ -1,7 +1,8 @@
 #include "info.h"
+#include <asm-generic/param.h>
 
 static int blocking(unsigned long, struct mutex *, wait_queue_head_t *);
-static wait_queue_head_t * get_lock(object_state *, session *);
+static wait_queue_head_t * get_lock(object_state *, session *, int);
 
 #ifndef _COMMONH_
 #define _COMMONH_
@@ -26,7 +27,7 @@ static int blocking(unsigned long timeout, struct mutex *mutex, wait_queue_head_
    return 1;
 }
 
-static wait_queue_head_t * get_lock(object_state *the_object, session *session){
+static wait_queue_head_t * get_lock(object_state *the_object, session *session, int minor){
 
    int ret;
    wait_queue_head_t *wq;
@@ -43,7 +44,14 @@ static wait_queue_head_t * get_lock(object_state *the_object, session *session){
       if (session->blocking == BLOCKING)
       {
 
+         if(session->priority == HIGH_PRIORITY) hp_threads[minor] ++;
+         else lp_threads[minor] ++;
+
          ret = blocking(session->timeout, &the_object->operation_synchronizer, wq);
+         
+         if(session->priority == HIGH_PRIORITY) hp_threads[minor] --;
+         else lp_threads[minor] --;
+
          if (ret == 0) return NULL;
       }
       else

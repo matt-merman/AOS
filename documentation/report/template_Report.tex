@@ -1,17 +1,43 @@
 \documentclass[12pt]{report}
 
 
+\usepackage{listings}
+\usepackage{color}
+\usepackage{graphicx}
+\graphicspath{ {./images/} }
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+	language=C,
+	aboveskip=3mm,
+	belowskip=3mm,
+	showstringspaces=false,
+	columns=flexible,
+	basicstyle={\small\ttfamily},
+	numbers=none,
+	numberstyle=\tiny\color{gray},
+	keywordstyle=\color{blue},
+	commentstyle=\color{dkgreen},
+	stringstyle=\color{mauve},
+	breaklines=true,
+	breakatwhitespace=true,
+	tabsize=3
+}
+
 % Title Page
 \title{Multi-flow device file}
-\author{Di Battista Mattia}
+\author{Di Battista Mattia (0304938)}
 \date{23 03 2022}
+
 
 \begin{document}
 \maketitle
 
 \tableofcontents
 
-\chapter*{Specification}
+\chapter{Specification}
 
 This specification is related to a Linux device driver implementing low and high priority flows of data.
 Through an open session to the device file a thread can read/write data segments. The data delivery
@@ -40,5 +66,62 @@ provide a picture of the current state of the device according to the following 
 \item number of threads currently waiting for data along the two flows (high vs low priority)
 \end{itemize}
 
-\chapter*{title}
+\chapter{Operations}
+\section{Read Operation}
+
+Read operation involved deleting the bytes read by the user, on the current flow. To do this a linked list was used, in which each node keeps the following fields:
+
+\begin{lstlisting}
+typedef struct _memory_node{
+	char *buffer;
+	struct _memory_node *next;
+} memory_node;
+\end{lstlisting}
+
+Each node points to its own buffer, the size of which can then be different for all items in the linked list. Buffers are allocated in write operations (see Chap.\ref{chap:write operation}). If the user requests the reading of a smaller number of bytes, than those written on all nodes, the deletion happens for the read bytes only and not on the entire buffer (see Fig.\ref{fig:read}). Reading begins from the first written node (\textbf{First-in-First-out policy}). 
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale = .45]{read.jpg}
+	\caption{Example of read operation}
+	\label{fig:read}
+\end{figure}
+
+The procedures for doing this are:
+
+\begin{lstlisting}
+memory_node *shift_buffer(int, int, memory_node *);
+int read(object_state *, const char *, loff_t *, size_t, session *, int);
+\end{lstlisting}
+
+\chapter{Write Operation}
+\label{chap:write operation} 
+For each write operation a new node and a buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not entire pages like \emph{get\_free\_page()}.} of size equal to the Bytes the user wants to write are allocated. Finally the new node is added to the list.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale = .45]{write.jpg}
+	\caption{Example of write operation}
+	\label{fig:write}
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\chapter{Reference}
 \end{document}          

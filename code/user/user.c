@@ -81,7 +81,6 @@ void *get_setting(int fd, char *device)
                 }
         }
 
-        // close(fd);
         return NULL;
 }
 
@@ -166,7 +165,7 @@ int main(int argc, char **argv)
         int fd = open(device, O_RDWR);
         if (fd == -1)
         {
-                printf("open error on device %s %s\n", device, strerror(errno));
+                printf("open error on device %s, %s\n", device, strerror(errno));
                 return -1;
         }
 

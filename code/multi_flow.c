@@ -48,6 +48,13 @@ static int dev_open(struct inode *inode, struct file *file)
    }
 #endif
 
+   if(enabled_device[minor]){
+
+      AUDIT printk("%s: dev with [minor] number [%d] disabled\n", MODNAME, minor);
+      return -1;
+   }
+
+
    session = kmalloc(sizeof(session), GFP_KERNEL);
    AUDIT printk("%s: ALLOCATED new session\n", MODNAME);
    if (session == NULL)
@@ -166,9 +173,6 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
          printk("%s: somebody called a BLOCKING read on HIGH-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
       
-      //TO-DO
-      //...
-      
       else 
          printk("%s: somebody called a NON-BLOCKING read on HIGH-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
@@ -181,9 +185,6 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
       AUDIT if (session->blocking == BLOCKING) 
          printk("%s: somebody called a BLOCKING read on LOW-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
-      
-      //TO-DO
-      //...
 
       else 
          printk("%s: somebody called a NON-BLOCKING read on LOW-PRIORITY flow on dev with " \
