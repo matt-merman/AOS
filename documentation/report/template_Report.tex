@@ -37,6 +37,7 @@
 
 \tableofcontents
 
+\chapter{How To Use}
 \chapter{Specification}
 
 This specification is related to a Linux device driver implementing low and high priority flows of data.
@@ -67,14 +68,158 @@ provide a picture of the current state of the device according to the following 
 \end{itemize}
 
 \chapter{Operations}
-\section{Read Operation}
+\section{Setting Operation}
 
-Read operation involved deleting the bytes read by the user, on the current flow. To do this a linked list was used, in which each node keeps the following fields:
+The user can set four modes of operation for his working session: 
+
+\begin{enumerate}
+	\item low priority
+	\item high priority
+	\item blocking
+	\item non blocking
+\end{enumerate}
+
+The data structure to store these parameters is:
 
 \begin{lstlisting}
+//FILE: info.h
+typedef struct _session{
+	bool priority;       
+	bool blocking;
+	unsigned long timeout;
+} session;
+\end{lstlisting}
+and is instantiated in \emph{dev\_open()}:
+
+\begin{lstlisting}
+//FILE: multi_flow.c
+session = kmalloc(sizeof(session), GFP_KERNEL);
+//...
+if (session == NULL) //...
+session->priority = HIGH_PRIORITY;
+session->blocking = NON_BLOCKING;
+session->timeout = 0;
+file->private_data = session;
+\end{lstlisting}
+
+The field \emph{unsigned long timeout} indicates the maximum time in blocking operations (i.e. read, write), for which the user waits.
+
+Parameter setting is done within \emph{dev\_ioctl()}:
+
+\begin{lstlisting}
+//FILE: multi_flow.c
+static long dev_ioctl(struct file *filp, unsigned int command, unsigned long param){
+	session *session;
+	session = filp->private_data;
+	
+	switch (command){
+	case 3:
+		session->priority = LOW_PRIORITY;
+		//...
+		break;
+	case 4:
+		session->priority = HIGH_PRIORITY;
+		//...
+		break;
+	case 5:
+		session->blocking = BLOCKING;
+		//...
+		break;
+	case 6:
+		session->blocking = NON_BLOCKING;
+		//...
+		break;
+	case 7:
+		session->timeout = param;
+		//...
+		break;
+	default:
+		//...
+	}
+return 0;
+}
+\end{lstlisting}
+
+To associate the session to a user, the field \emph{private\_data} of \emph{struct file *filp} has been used. 
+
+
+
+\section{Write Operation}
+\label{chap:write operation}
+
+Unlike the read op. (see Chap. \ref{chap:read operation}) the write can be done with low priority (based on delayed work). In this way the operation is added to a work queue\footnote{One is defined for each flow in the procedure \emph{init\_module()}, with  \emph{init\_waitqueue\_head()}.} and performed by system daemons.
+
+\begin{lstlisting}
+//FILE: multi_flow.c
+if (session->priority == HIGH_PRIORITY){
+	priority_obj = &the_object[HIGH_PRIORITY];
+	//...	
+	ret = write(priority_obj, buff, off, len, session, minor);
+}else{
+	priority_obj = &the_object[LOW_PRIORITY];
+	//...	
+	ret = put_work(filp, buff, len, off, priority_obj, session, minor);
+	if (ret != 0) //...
+	ret = len;
+}
+\end{lstlisting}
+
+The procedures for doing so are:
+
+\begin{lstlisting}
+//FILE: write.h
+int write(object_state *, 
+			const char *, 
+			loff_t *, 
+			size_t, 
+			session *, 
+			int);
+void delayed_write(unsigned long);
+long put_work(struct file *, 
+			const char *, 
+			size_t, 
+			loff_t *, 
+			object_state *, 
+			session *, 
+			int);
+\end{lstlisting}
+
+For each write operation a new node and a buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not entire pages like \emph{get\_free\_page()}.} of size equal to the Bytes the user wants to write are allocated. Finally the new node is added to the list.
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[scale = .45]{write.jpg}
+	\caption{Example of write operation}
+	\label{fig:write}
+\end{figure}
+
+
+
+
+\section{Read Operation}
+\label{chap:read operation}
+
+Read operations are all performed synchronously (without delayed work as for write op.), when an invocation occurs the data structure for one of the two flows is set:
+
+\begin{lstlisting}
+//FILE: multi_flow.c
+if (session->priority == HIGH_PRIORITY){
+priority_obj = &the_object[HIGH_PRIORITY];
+//...
+}else{
+priority_obj = &the_object[LOW_PRIORITY];
+//...
+}
+ret = read(priority_obj, buff, off, len, session, minor);
+\end{lstlisting}
+
+In addition, they involved deleting the bytes read by the user, on the current flow. To do this a linked list was used, in which each node keeps the following fields:
+
+\begin{lstlisting}
+//FILE: info.h
 typedef struct _memory_node{
-	char *buffer;
-	struct _memory_node *next;
+char *buffer;
+struct _memory_node *next;
 } memory_node;
 \end{lstlisting}
 
@@ -90,38 +235,45 @@ Each node points to its own buffer, the size of which can then be different for 
 The procedures for doing this are:
 
 \begin{lstlisting}
+//FILE: read.h
 memory_node *shift_buffer(int, int, memory_node *);
 int read(object_state *, const char *, loff_t *, size_t, session *, int);
 \end{lstlisting}
 
-\chapter{Write Operation}
-\label{chap:write operation} 
-For each write operation a new node and a buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not entire pages like \emph{get\_free\_page()}.} of size equal to the Bytes the user wants to write are allocated. Finally the new node is added to the list.
+\chapter{Parameters}
 
-\begin{figure}[h]
-	\centering
-	\includegraphics[scale = .45]{write.jpg}
-	\caption{Example of write operation}
-	\label{fig:write}
-\end{figure}
+The required module parameters to deploy are:
 
+\begin{enumerate}
+	\item enable or disable the device file
+	\item number of bytes currently present in the two flows (high vs low priority)
+	\item number of threads currently waiting for data along the two flows (high vs low priority)
+\end{enumerate}
+implemented with:
 
+\begin{lstlisting}
+//FILE: info.h
+static bool enabled_device[MINORS];
+module_param_array(enabled_device, bool, NULL, 0744);
+MODULE_PARM_DESC(...);
 
+static int hp_bytes[MINORS];
+module_param_array(hp_bytes, int, NULL, 0744);
+MODULE_PARM_DESC(...);
 
+static int lp_bytes[MINORS];
+module_param_array(lp_bytes, int, NULL, 0744);
+MODULE_PARM_DESC(...);
 
+static int hp_threads[MINORS];
+module_param_array(hp_threads, int, NULL, 0744);
+MODULE_PARM_DESC(...);
 
+static int lp_threads[MINORS];
+module_param_array(lp_threads, int, NULL, 0744);
+MODULE_PARM_DESC(...);
+\end{lstlisting}
 
-
-
-
-
-
-
-
-
-
-
-
-
+\chapter{User}
 \chapter{Reference}
 \end{document}          

@@ -64,7 +64,6 @@ int write(object_state *the_object,
 
         //*off += (len - ret);
         *off = 0;
-        // the_object->valid_bytes = *off;
 
         //TEST blocking      
         mutex_unlock(&(the_object->operation_synchronizer));

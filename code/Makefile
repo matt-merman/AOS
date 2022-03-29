@@ -6,3 +6,20 @@ all:
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+
+show-device:
+	cat /sys/module/multi_flow/parameter/enabled_device
+
+show-hp_bytes:
+	cat /sys/module/multi_flow/parameter/hp_bytes
+
+show-lp_bytes:
+	cat /sys/module/multi_flow/parameter/lp_bytes
+
+show-hp_threads:
+	cat /sys/module/multi_flow/parameter/hp_threads
+
+show-lp_threads:
+	cat /sys/module/multi_flow/parameter/lp_threads
+
+	

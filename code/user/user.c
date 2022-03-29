@@ -15,6 +15,7 @@
 
 char buff[4096];
 char out[OUT_LEN];
+bool timer;
 
 void *get_setting(int fd, char *device)
 {
@@ -141,7 +142,7 @@ int main(int argc, char **argv)
 
         if (argc < 3)
         {
-                printf("useg: prog pathname major\n");
+                printf("Usage: ./sudo user [Path Device File] [Major Number]\n");
                 return -1;
         }
 

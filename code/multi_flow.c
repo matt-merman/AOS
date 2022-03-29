@@ -17,10 +17,6 @@ static int Major; /* Major number assigned to broadcast device driver */
 #define get_minor(session) MINOR(session->f_dentry->d_inode->i_rdev)
 #endif
 
-#ifdef SINGLE_INSTANCE
-static DEFINE_MUTEX(device_state);
-#endif
-
 object_state objects[MINORS][NUM_FLOW];
 
 static int dev_open(struct inode *inode, struct file *file)
@@ -29,31 +25,13 @@ static int dev_open(struct inode *inode, struct file *file)
    session *session;
    int minor = get_minor(file);
 
-   if (minor >= MINORS)
-   {
-      return -ENODEV;
-   }
-#ifdef SINGLE_INSTANCE
-   // this device file is single instance
-   if (!mutex_trylock(&device_state))
-   {
-      return -EBUSY;
-   }
-#endif
-
-#ifdef SINGLE_SESSION_OBJECT
-   if (!mutex_trylock(&(objects[minor].object_busy)))
-   {
-      goto open_failure;
-   }
-#endif
+   if (minor >= MINORS) return -ENODEV;
 
    if(enabled_device[minor]){
 
       AUDIT printk("%s: dev with [minor] number [%d] disabled\n", MODNAME, minor);
       return -1;
    }
-
 
    session = kmalloc(sizeof(session), GFP_KERNEL);
    AUDIT printk("%s: ALLOCATED new session\n", MODNAME);
@@ -69,16 +47,8 @@ static int dev_open(struct inode *inode, struct file *file)
    file->private_data = session;
 
    AUDIT printk("%s: device file successfully opened for object with minor %d\n", MODNAME, minor);
-   // device opened by a default nop
+   
    return 0;
-
-#ifdef SINGLE_SESSION_OBJECT
-open_failure:
-#ifdef SINGE_INSTANCE
-   mutex_unlock(&device_state);
-#endif
-   return -EBUSY;
-#endif
 }
 
 static int dev_release(struct inode *inode, struct file *file)
@@ -87,18 +57,10 @@ static int dev_release(struct inode *inode, struct file *file)
    session *session = file->private_data;
    int minor = get_minor(file);
 
-#ifdef SINGLE_SESSION_OBJECT
-   mutex_unlock(&(objects[minor].object_busy));
-#endif
-
-#ifdef SINGLE_INSTANCE
-   mutex_unlock(&device_state);
-#endif
-
    kfree(session);
 
    AUDIT printk("%s: device file closed\n", MODNAME);
-   // device closed by default nop
+   
    return 0;
 }
 
@@ -259,9 +221,6 @@ int init_module(void)
    // initialize the drive internal state
    for (i = 0; i < MINORS; i++)
    {
-#ifdef SINGLE_SESSION_OBJECT
-      mutex_init(&(objects[i].object_busy));
-#endif
 
       for (j = 0; j < NUM_FLOW; j++)
       {
