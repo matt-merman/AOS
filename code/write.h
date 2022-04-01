@@ -25,7 +25,7 @@ int write(object_state *the_object,
 {
 
         memory_node *node, *current_node;
-        char *buffer, buf;
+        char *buffer;
         int ret;
         wait_queue_head_t *wq;
 
@@ -59,9 +59,8 @@ int write(object_state *the_object,
         node->next = NULL;
         node->buffer = NULL;
 
-        //*off += (len - ret);
-        *off = 0;
- 
+        *off += (len - ret);
+
 #ifndef TEST   
         mutex_unlock(&(the_object->operation_synchronizer));
         wake_up(wq);
@@ -112,7 +111,7 @@ long put_work(struct file *filp,
         {
                 printk("%s: tasklet buffer allocation failure\n", MODNAME);
                 module_put(THIS_MODULE);
-                return -1;
+                return -ENOMEM;
         }
 
         the_task->filp = filp;
@@ -122,7 +121,6 @@ long put_work(struct file *filp,
         the_task->the_object = the_object;
         the_task->session = session;
         the_task->minor = minor;
-
 
         AUDIT printk("%s: work buffer allocation success - address is %p\n", MODNAME, the_task);
 

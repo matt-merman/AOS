@@ -34,7 +34,7 @@ the following information:
 
 ```bash
 #Compile kernel module (on /multi_flow/code/)
-make
+make all
 
 #Clean objects file
 make clean
@@ -49,15 +49,21 @@ sudo rmmod multi_flow.ko
 make
 
 #Run user 
-sudo ./user /dev/test 240
+sudo ./user /dev/test 240 1
 
-#Set kernel module's parameters (i.e. enabled_device, hp_bytes, lp_bytes, hp_threads, lp_threads)
-cd /sys/module/multi_flow/parameters
+#Show kernel module's parameters (i.e. enabled_device, hp_bytes, lp_bytes, hp_threads, lp_threads)
+make show-device
+make show-hp_bytes
+make show-lp_bytes
+make show-hp_threads
+make show-lp_threads
+
+#Set enabled_device (file in /code/user/)
+sudo python3 script.py 1 2 45 127
 ```
 
 >NOTICE: _240_ identifies the major number for the driver. It could be different for each insertion. To see your, use _dmesg_ command.  
 
 ## Implementation
 
-Please see [report](https://github.com/matt-merman/linux_device_driver/blob/main/documentation/report/report.pdf).
-
+Please see [report](https://github.com/matt-merman/linux_device_driver/blob/main/report/report.pdf).

@@ -16,6 +16,7 @@
 #include <linux/tty.h>     /* For the tty declarations */
 #include <linux/version.h> /* For LINUX_VERSION_CODE */
 #include <linux/moduleparam.h>
+#include <linux/jiffies.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mattia Di Battista");
@@ -33,13 +34,13 @@ MODULE_DESCRIPTION("Multi-flow device file");
 #define BLOCKING 0
 #define NON_BLOCKING 1
 
-#define TEST //macro used to unrelease the lock on write op. In this way you can test blocking operations.
+//#define TEST //macro used to unrelease the lock on write op. In this way you can test blocking operations.
 
 #ifndef _INFOH_
 #define _INFOH_
 
-static bool enabled_device[MINORS];
-module_param_array(enabled_device, bool, NULL, 0660);
+static int enabled_device[MINORS];
+module_param_array(enabled_device, int, NULL, 0660);
 MODULE_PARM_DESC(enabled_device, "Module parameter is implemented in order to enable or disable " \
 "the device file, in terms of a specific minor number. If it is disabled, " \
 "any attempt to open a session should fail (but already open sessions will be still managed).");

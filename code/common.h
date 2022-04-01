@@ -1,5 +1,4 @@
 #include "info.h"
-#include <asm-generic/param.h>
 
 static int blocking(unsigned long, struct mutex *, wait_queue_head_t *);
 static wait_queue_head_t * get_lock(object_state *, session *, int);
@@ -15,7 +14,7 @@ static int blocking(unsigned long timeout, struct mutex *mutex, wait_queue_head_
 
    AUDIT printk("%s: thread %d going to sleep for %lu microsecs\n", MODNAME, current->pid, timeout);
 
-   timeout = (timeout*HZ)/1000;   
+   timeout = msecs_to_jiffies(timeout); 
 
    //Returns 0, if the condition evaluated to false after the timeout elapsed
    val = wait_event_timeout(*wq, mutex_trylock(mutex), timeout);

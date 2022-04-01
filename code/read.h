@@ -1,7 +1,7 @@
 #include "common.h"
 
 memory_node *shift_buffer(int, int, memory_node *);
-int read(object_state *, const char *, loff_t *, size_t, session *, int);
+int read(object_state *, char *, loff_t *, size_t, session *, int);
 
 memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 {
@@ -35,21 +35,21 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 }
 
 int read(object_state *the_object, 
-   const char *buff, 
+   char *buff, 
    loff_t *off, 
    size_t len, 
    session *session,
    int minor)
 {
 
-   int ret = 0, residual_bytes = len, lenght_buffer = 0;
+   int ret = 0, residual_bytes = len, lenght_buffer = 0, exit_mem = 0;
    memory_node *current_node, *last_node;
    wait_queue_head_t *wq;
  
    wq = get_lock(the_object, session, minor);
    if (wq == NULL) return -EAGAIN;
 
-   //lenght_buffer -= *off;
+   *off = 0;
 
    current_node = the_object->head;
    // PHASE 1: READING
@@ -90,8 +90,6 @@ int read(object_state *the_object,
 
    lenght_buffer = strlen(current_node->buffer);
    
-   //lenght_buffer -= *off;
-   
    if (len > lenght_buffer)
    {
 
@@ -121,7 +119,10 @@ int read(object_state *the_object,
       }
 
       the_object->head = shift_buffer(lenght_buffer, residual_bytes, last_node);
-      if (the_object->head == NULL) goto exit;
+      if (the_object->head == NULL){
+         exit_mem = 1;
+         goto exit; 
+      }
    }
    else if (len == lenght_buffer)
    {
@@ -139,18 +140,24 @@ int read(object_state *the_object,
    {
 
       current_node = shift_buffer(lenght_buffer, len, current_node);
-      if (current_node == NULL) goto exit;
+      if (current_node == NULL){
+         exit_mem = 1;
+         goto exit; 
+      }
    }
 
 exit:
 
-   //*off += len - ret;
+   *off += len - ret;
    
    if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
    else lp_bytes[minor] -= ret;
 
    mutex_unlock(&(the_object->operation_synchronizer));
    wake_up(wq);
+
+   if(exit_mem) return -ENOMEM;
+
    return ret;
 
 }

@@ -30,7 +30,7 @@ static int dev_open(struct inode *inode, struct file *file)
    if(enabled_device[minor]){
 
       AUDIT printk("%s: dev with [minor] number [%d] disabled\n", MODNAME, minor);
-      return -1;
+      return -ENOENT;
    }
 
    session = kmalloc(sizeof(session), GFP_ATOMIC);
@@ -55,20 +55,12 @@ static int dev_release(struct inode *inode, struct file *file)
 {
 
    session *session = file->private_data;
-   int minor = get_minor(file);
-
    kfree(session);
 
    AUDIT printk("%s: device file closed\n", MODNAME);
    
    return 0;
 }
-
-/*
-the high priority data flow must offer synchronous write operations while the low priority data flow must offer
-an asynchronous execution (based on delayed work) of write operations, while still keeping
-the interface able to synchronously notify the outcome (*).
-*/
 
 static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t *off)
 {
@@ -83,12 +75,14 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
       priority_obj = &the_object[HIGH_PRIORITY];
 
-      AUDIT if (session->blocking == BLOCKING) 
+   #ifdef AUDIT
+      if (session->blocking == BLOCKING) 
          printk("%s: somebody called a BLOCKING HIGH-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
       else 
          printk("%s: somebody called a NON-BLOCKING HIGH-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
+   #endif
 
       ret = write(priority_obj, buff, off, len, session, minor);
    }
@@ -97,20 +91,23 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
       priority_obj = &the_object[LOW_PRIORITY];
 
-      AUDIT if (session->blocking == BLOCKING) 
+   #ifdef AUDIT
+      if (session->blocking == BLOCKING) 
          printk("%s: somebody called a BLOCKING LOW-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
       else 
          printk("%s: somebody called a NON-BLOCKING LOW-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
+   #endif
 
       ret = put_work(filp, buff, len, off, priority_obj, session, minor);
       if (ret != 0)
       {
          printk("%s: Error on LOW-PRIORITY write on dev with [major,minor] number "\
          "[%d,%d]\n", MODNAME, get_major(filp), minor);
-         return -1;
+         return ret;
       }
+      
       ret = len;
    }
 
@@ -131,40 +128,36 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
 
       priority_obj = &the_object[HIGH_PRIORITY];
 
-      AUDIT if (session->blocking == BLOCKING) 
+   #ifdef AUDIT
+      if (session->blocking == BLOCKING) 
          printk("%s: somebody called a BLOCKING read on HIGH-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
       
       else 
          printk("%s: somebody called a NON-BLOCKING read on HIGH-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
+   #endif
    }
    else
    {
 
       priority_obj = &the_object[LOW_PRIORITY];
 
-      AUDIT if (session->blocking == BLOCKING) 
+   #ifdef AUDIT
+      if (session->blocking == BLOCKING) 
          printk("%s: somebody called a BLOCKING read on LOW-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
 
       else 
          printk("%s: somebody called a NON-BLOCKING read on LOW-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
+   #endif
    }
 
    ret = read(priority_obj, buff, off, len, session, minor);
 
    return ret;
 }
-
-/*
-The device driver should implement the support for the ioctl(..) service in order to manage the I/O session
-as follows:
-- setup of the priority level (high or low) for the operations
-- blocking vs non-blocking read and write operations
-- setup of a timeout regulating the awake of blocking operations
-*/
 
 static long dev_ioctl(struct file *filp, unsigned int command, unsigned long param)
 {

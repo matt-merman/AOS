@@ -1,2 +1,2 @@
 all:
-	gcc user.c -o user
+	gcc  -Wall -Wextra user.c -o user
