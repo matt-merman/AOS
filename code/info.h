@@ -33,29 +33,31 @@ MODULE_DESCRIPTION("Multi-flow device file");
 #define BLOCKING 0
 #define NON_BLOCKING 1
 
+#define TEST //macro used to unrelease the lock on write op. In this way you can test blocking operations.
+
 #ifndef _INFOH_
 #define _INFOH_
 
 static bool enabled_device[MINORS];
-module_param_array(enabled_device, bool, NULL, 0744);
+module_param_array(enabled_device, bool, NULL, 0660);
 MODULE_PARM_DESC(enabled_device, "Module parameter is implemented in order to enable or disable " \
 "the device file, in terms of a specific minor number. If it is disabled, " \
 "any attempt to open a session should fail (but already open sessions will be still managed).");
 
 static int hp_bytes[MINORS];
-module_param_array(hp_bytes, int, NULL, 0744);
+module_param_array(hp_bytes, int, NULL, 0660);
 MODULE_PARM_DESC(hp_bytes, "Number of bytes currently present in the high priority flow.");
 
 static int lp_bytes[MINORS];
-module_param_array(lp_bytes, int, NULL, 0744);
+module_param_array(lp_bytes, int, NULL, 0660);
 MODULE_PARM_DESC(lp_bytes, "Number of bytes currently present in the low priority flow.");
 
 static int hp_threads[MINORS];
-module_param_array(hp_threads, int, NULL, 0744);
+module_param_array(hp_threads, int, NULL, 0660);
 MODULE_PARM_DESC(hp_threads, "Number of threads currently waiting for data along the high priority flow.");
 
 static int lp_threads[MINORS];
-module_param_array(lp_threads, int, NULL, 0744);
+module_param_array(lp_threads, int, NULL, 0660);
 MODULE_PARM_DESC(lp_threads, "Number of threads currently waiting for data along the low priority flow.");
 
 typedef struct _memory_node

@@ -27,13 +27,32 @@
 }
 
 % Title Page
-\title{Multi-flow device file}
-\author{Di Battista Mattia (0304938)}
-\date{23 03 2022}
-
+\newcommand*{\myTitle}{\begingroup 
+	\centering 
+	\vspace*{\baselineskip} 
+	
+	
+	{\LARGE Advanced Operating Systems}% Title
+	\vspace*{1\baselineskip}
+	
+	\scshape % Small caps
+	Multi-flow device file
+	
+	\vspace*{1\baselineskip}
+	University of Rome Tor Vergata\\[\baselineskip]
+	
+	
+	\vspace*{5\baselineskip} 
+	
+	{\large Di Battista Mattia (0304938)\par} 
+	
+	\vspace*{1\baselineskip}
+	\today
+	
+	\endgroup\clearpage}
 
 \begin{document}
-\maketitle
+\myTitle
 
 \tableofcontents
 
@@ -204,11 +223,11 @@ Read operations are all performed synchronously (without delayed work as for wri
 \begin{lstlisting}
 //FILE: multi_flow.c
 if (session->priority == HIGH_PRIORITY){
-priority_obj = &the_object[HIGH_PRIORITY];
-//...
+	priority_obj = &the_object[HIGH_PRIORITY];	
+	//...
 }else{
-priority_obj = &the_object[LOW_PRIORITY];
-//...
+	priority_obj = &the_object[LOW_PRIORITY];
+	//...
 }
 ret = read(priority_obj, buff, off, len, session, minor);
 \end{lstlisting}
@@ -218,8 +237,8 @@ In addition, they involved deleting the bytes read by the user, on the current f
 \begin{lstlisting}
 //FILE: info.h
 typedef struct _memory_node{
-char *buffer;
-struct _memory_node *next;
+	char *buffer;
+	struct _memory_node *next;
 } memory_node;
 \end{lstlisting}
 
@@ -273,6 +292,8 @@ static int lp_threads[MINORS];
 module_param_array(lp_threads, int, NULL, 0744);
 MODULE_PARM_DESC(...);
 \end{lstlisting}
+
+
 
 \chapter{User}
 \chapter{Reference}

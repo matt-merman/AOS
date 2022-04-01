@@ -15,7 +15,6 @@
 
 char buff[4096];
 char out[OUT_LEN];
-bool timer;
 
 void *get_setting(int fd, char *device)
 {

@@ -25,25 +25,25 @@ int write(object_state *the_object,
 {
 
         memory_node *node, *current_node;
-        char *buffer;
+        char *buffer, buf;
         int ret;
         wait_queue_head_t *wq;
-        
-        wq = get_lock(the_object, session, minor);
-        if (wq == NULL) return 0;
 
-        if(session->priority == HIGH_PRIORITY) hp_bytes[minor] += len;
-        else lp_bytes[minor] += len;
-
-        node = kmalloc(sizeof(memory_node), GFP_KERNEL);
-        buffer = kmalloc(len, GFP_KERNEL);
+        node = kmalloc(sizeof(memory_node), GFP_ATOMIC);
+        buffer = kmalloc(len, GFP_ATOMIC);
         if (node == NULL || buffer == NULL)
         {
                 printk("%s: unable to allocate a memory\n", MODNAME);
-                mutex_unlock(&(the_object->operation_synchronizer));
-                wake_up(wq);
-                return -1;
+                return -ENOMEM;
         }
+
+        ret = copy_from_user(buffer, buff, len);
+
+        wq = get_lock(the_object, session, minor);
+        if (wq == NULL) return -EAGAIN;
+
+        if(session->priority == HIGH_PRIORITY) hp_bytes[minor] += len;
+        else lp_bytes[minor] += len;
 
         AUDIT printk("%s: ALLOCATED a new memory node\n", MODNAME);
         AUDIT printk("%s: ALLOCATED %ld bytes\n", MODNAME, len);
@@ -59,16 +59,13 @@ int write(object_state *the_object,
         node->next = NULL;
         node->buffer = NULL;
 
-        // returns the number of bytes NOT copied
-        ret = copy_from_user(current_node->buffer, buff, len);
-
         //*off += (len - ret);
         *off = 0;
-
-        //TEST blocking      
+ 
+#ifndef TEST   
         mutex_unlock(&(the_object->operation_synchronizer));
         wake_up(wq);
-
+#endif
         return len - ret;
 }
 

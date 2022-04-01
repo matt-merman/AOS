@@ -6,8 +6,7 @@ This specification is related to a Linux device driver implementing low and
 high priority flows of data. Through an open session to the device file a thread
 can read/write data segments. The data delivery follows a First-in-First-out
 policy along each of the two different data flows (low and high priority). After
-read operations, the read data disappear from the flow. Also, the high prior-
-ity data flow must offer synchronous write operations while the low priority
+read operations, the read data disappear from the flow. Also, the high priority data flow must offer synchronous write operations while the low priority
 data flow must offer an asynchronous execution (based on delayed work)
 of write operations, while still keeping the interface able to synchronously
 notify the outcome. Read operations are all executed synchronously. The
@@ -53,7 +52,7 @@ make
 sudo ./user /dev/test 240
 
 #Set kernel module's parameters (i.e. enabled_device, hp_bytes, lp_bytes, hp_threads, lp_threads)
-cd /sys/module/multi_flow/parameter
+cd /sys/module/multi_flow/parameters
 ```
 
 >NOTICE: _240_ identifies the major number for the driver. It could be different for each insertion. To see your, use _dmesg_ command.  

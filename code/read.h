@@ -8,7 +8,7 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 
    int dim = lenght - offset;
    
-   char *remaning_buff = kmalloc(dim, GFP_KERNEL);
+   char *remaning_buff = kmalloc(dim, GFP_ATOMIC);
 
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (remaning_buff == NULL)
@@ -20,7 +20,7 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
    strncpy(remaning_buff, &node->buffer[offset], lenght);
    kfree(node->buffer);
 
-   node->buffer = kmalloc(dim, GFP_KERNEL);
+   node->buffer = kmalloc(dim, GFP_ATOMIC);
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (node->buffer == NULL)
    {
@@ -47,8 +47,7 @@ int read(object_state *the_object,
    wait_queue_head_t *wq;
  
    wq = get_lock(the_object, session, minor);
-   if (wq == NULL) return 0;
-
+   if (wq == NULL) return -EAGAIN;
 
    //lenght_buffer -= *off;
 
@@ -87,16 +86,7 @@ int read(object_state *the_object,
    // PHASE 2: REMOVING
    current_node = the_object->head;
 
-   if (current_node->buffer == NULL)
-   {
-      //*off += len - ret;
-      if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
-      else lp_bytes[minor] -= ret;
-
-      mutex_unlock(&(the_object->operation_synchronizer));
-      wake_up(wq);
-      return ret;
-   }
+   if (current_node->buffer == NULL) goto exit;
 
    lenght_buffer = strlen(current_node->buffer);
    
@@ -127,27 +117,11 @@ int read(object_state *the_object,
          else if (last_node->buffer == NULL)
             the_object->head = last_node;
 
-         //*off += len - ret;
-         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
-         else lp_bytes[minor] -= ret;
-         
-         mutex_unlock(&(the_object->operation_synchronizer));
-         wake_up(wq);
-         return ret;
+         goto exit;
       }
 
       the_object->head = shift_buffer(lenght_buffer, residual_bytes, last_node);
-      if (the_object->head == NULL)
-      {
-
-         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
-         else lp_bytes[minor] -= ret;
-         
-         mutex_unlock(&(the_object->operation_synchronizer));
-         //*off += len - ret;
-         wake_up(wq);
-         return ret;
-      }
+      if (the_object->head == NULL) goto exit;
    }
    else if (len == lenght_buffer)
    {
@@ -165,25 +139,18 @@ int read(object_state *the_object,
    {
 
       current_node = shift_buffer(lenght_buffer, len, current_node);
-      if (current_node == NULL)
-      {
-         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
-         else lp_bytes[minor] -= ret;
-         
-         mutex_unlock(&(the_object->operation_synchronizer));
-         //*off += len - ret;
-         wake_up(wq);
-         return ret;
-      }
+      if (current_node == NULL) goto exit;
    }
 
-   //*off += len - ret;
+exit:
 
+   //*off += len - ret;
+   
    if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
    else lp_bytes[minor] -= ret;
 
    mutex_unlock(&(the_object->operation_synchronizer));
    wake_up(wq);
-   
    return ret;
+
 }

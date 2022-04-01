@@ -33,7 +33,7 @@ static int dev_open(struct inode *inode, struct file *file)
       return -1;
    }
 
-   session = kmalloc(sizeof(session), GFP_KERNEL);
+   session = kmalloc(sizeof(session), GFP_ATOMIC);
    AUDIT printk("%s: ALLOCATED new session\n", MODNAME);
    if (session == NULL)
    {
