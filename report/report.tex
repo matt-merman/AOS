@@ -1,9 +1,13 @@
 \documentclass[12pt]{report}
 
+\def\MakeUppercaseUnsupportedInPdfStrings{\scshape}
 
-\usepackage{listings}
+\usepackage{listings, titling}
 \usepackage{color}
 \usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{biblatex}
+
 \graphicspath{ {./images/} }
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -19,7 +23,7 @@
 	numbers=none,
 	numberstyle=\tiny\color{gray},
 	keywordstyle=\color{blue},
-	commentstyle=\color{dkgreen},
+	commentstyle=\color{gray},
 	stringstyle=\color{mauve},
 	breaklines=true,
 	breakatwhitespace=true,
@@ -52,11 +56,11 @@
 	\endgroup\clearpage}
 
 \begin{document}
+\begin{titlingpage}
 \myTitle
-
+\end{titlingpage}
 \tableofcontents
 
-\chapter{How To Use}
 \chapter{Specification}
 
 This specification is related to a Linux device driver implementing low and high priority flows of data.
@@ -92,6 +96,7 @@ provide a picture of the current state of the device according to the following 
 The user can set four modes of operation for his working session: 
 
 \begin{enumerate}
+	\itemsep0em 
 	\item low priority
 	\item high priority
 	\item blocking
@@ -108,7 +113,19 @@ typedef struct _session{
 	unsigned long timeout;
 } session;
 \end{lstlisting}
-and is instantiated in \emph{dev\_open()}:
+
+It is single for each thread, unlike the \emph{\_object\_state} unique for each device file.
+
+\begin{lstlisting}
+//FILE: info.h
+typedef struct _object_state{
+	struct mutex operation_synchronizer;
+	memory_node *head;
+	wait_queue_head_t wq;
+} object_state;
+\end{lstlisting}
+
+\emph{\_\_session} is instantiated in \emph{dev\_open()}:
 
 \begin{lstlisting}
 //FILE: multi_flow.c
@@ -121,7 +138,7 @@ session->timeout = 0;
 file->private_data = session;
 \end{lstlisting}
 
-The field \emph{unsigned long timeout} indicates the maximum time in blocking operations (i.e. read, write), for which the user waits.
+The field \emph{unsigned long timeout} indicates the maximum time (expressed as microseconds) in blocking operations (i.e. read, write), for which the user waits. 
 
 Parameter setting is done within \emph{dev\_ioctl()}:
 
@@ -136,18 +153,7 @@ static long dev_ioctl(struct file *filp, unsigned int command, unsigned long par
 		session->priority = LOW_PRIORITY;
 		//...
 		break;
-	case 4:
-		session->priority = HIGH_PRIORITY;
-		//...
-		break;
-	case 5:
-		session->blocking = BLOCKING;
-		//...
-		break;
-	case 6:
-		session->blocking = NON_BLOCKING;
-		//...
-		break;
+	//...
 	case 7:
 		session->timeout = param;
 		//...
@@ -161,12 +167,27 @@ return 0;
 
 To associate the session to a user, the field \emph{private\_data} of \emph{struct file *filp} has been used. 
 
+\section{Blocking Operation}
 
+In a blocking operation the thread goes to sleep, in the respective wait queue of the object\footnote{There are  two for each object: a low and high priority}, in case it fails to take the lock. 
+
+\begin{lstlisting}
+//FILE: common.h
+static int blocking(unsigned long timeout, struct mutex *mutex, wait_queue_head_t *wq){
+	//...	
+	timeout = msecs_to_jiffies(timeout); 	
+	//Returns 0, if the condition evaluated to false after the timeout elapsed
+	val = wait_event_timeout(*wq, mutex_trylock(mutex), timeout);
+	//...
+}
+\end{lstlisting}
+
+The thread waits for a certain time, until the lock is released. Time passed to \emph{wait\_event\_timeout()} is converted from microseconds to jiffies with \emph{msecs\_to\_jiffies()}. An error code\footnote{EAGAIN: Resource temporarily unavailable.} is returned if the timer has expired.
 
 \section{Write Operation}
 \label{chap:write operation}
 
-Unlike the read op. (see Chap. \ref{chap:read operation}) the write can be done with low priority (based on delayed work). In this way the operation is added to a work queue\footnote{One is defined for each flow in the procedure \emph{init\_module()}, with  \emph{init\_waitqueue\_head()}.} and performed by system daemons.
+Unlike the read op. (see Chap. \ref{chap:read operation}) the write can be done with low priority (based on delayed work). In this way the operation is performed by system daemons\footnote{Unlike  tasklets, work queues allow you to queue blocking activities, executed by threads in charge of doing this.}.
 
 \begin{lstlisting}
 //FILE: multi_flow.c
@@ -183,27 +204,29 @@ if (session->priority == HIGH_PRIORITY){
 }
 \end{lstlisting}
 
-The procedures for doing so are:
+To define deferred work:
 
 \begin{lstlisting}
 //FILE: write.h
-int write(object_state *, 
-			const char *, 
-			loff_t *, 
-			size_t, 
-			session *, 
-			int);
-void delayed_write(unsigned long);
-long put_work(struct file *, 
-			const char *, 
-			size_t, 
-			loff_t *, 
-			object_state *, 
-			session *, 
-			int);
+long put_work(struct file *filp,
+	const char *buff,
+	size_t len,
+	loff_t *off,
+	object_state *the_object,
+	session *session,
+	int minor){
+	
+	//...
+	
+	__INIT_WORK(&(the_task->the_work), (void *)delayed_write, (unsigned long)(&(the_task->the_work)));
+	
+	schedule_work(&the_task->the_work);
+	
+	return 0;
+}
 \end{lstlisting}
 
-For each write operation a new node and a buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not entire pages like \emph{get\_free\_page()}.} of size equal to the Bytes the user wants to write are allocated. Finally the new node is added to the list.
+For each write operation a new node and buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not whole pages like \emph{get\_free\_page()}.} are allocated. The buffer's size is equal to the amount of Bytes the user wants to write. Finally the new node is added to the list (one for each stream).
 
 \begin{figure}[h]
 	\centering
@@ -212,8 +235,32 @@ For each write operation a new node and a buffer (both with \emph{kmalloc()}\foo
 	\label{fig:write}
 \end{figure}
 
+\emph{copy\_from\_user()} may sleep if pagefaults are enabled. That's why it is invoked before requiring the lock on the flow\footnote{As an alternative could be invoked the \emph{\_\_copy\_to\_user\_inatomic()} (see \href{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html}{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html})}.
 
+\begin{lstlisting}
+//FILE: write.h
+int write(object_state *the_object,
+	const char *buff,
+	loff_t *off, 
+	size_t len, 
+	session *session,
+	int minor){
 
+	//...
+	node = kmalloc(sizeof(memory_node), GFP_ATOMIC);
+	buffer = kmalloc(len, GFP_ATOMIC);
+	if (node == NULL || buffer == NULL)
+	{
+	printk("%s: unable to allocate a memory\n", MODNAME);
+	return -ENOMEM;
+	}
+	
+	ret = copy_from_user(buffer, buff, len);
+	
+	wq = get_lock(the_object, session, minor);
+	if (wq == NULL) return -EAGAIN;
+	//...
+\end{lstlisting}
 
 \section{Read Operation}
 \label{chap:read operation}
@@ -264,37 +311,77 @@ int read(object_state *, const char *, loff_t *, size_t, session *, int);
 The required module parameters to deploy are:
 
 \begin{enumerate}
+	\itemsep0em 
 	\item enable or disable the device file
 	\item number of bytes currently present in the two flows (high vs low priority)
 	\item number of threads currently waiting for data along the two flows (high vs low priority)
 \end{enumerate}
-implemented with:
+
+Implemented with:
 
 \begin{lstlisting}
 //FILE: info.h
-static bool enabled_device[MINORS];
-module_param_array(enabled_device, bool, NULL, 0744);
+static int enabled_device[MINORS];
+module_param_array(enabled_device, int, NULL, 0660);
 MODULE_PARM_DESC(...);
 
 static int hp_bytes[MINORS];
-module_param_array(hp_bytes, int, NULL, 0744);
+module_param_array(hp_bytes, int, NULL, 0660);
 MODULE_PARM_DESC(...);
 
 static int lp_bytes[MINORS];
-module_param_array(lp_bytes, int, NULL, 0744);
+module_param_array(lp_bytes, int, NULL, 0660);
 MODULE_PARM_DESC(...);
 
 static int hp_threads[MINORS];
-module_param_array(hp_threads, int, NULL, 0744);
+module_param_array(hp_threads, int, NULL, 0660);
 MODULE_PARM_DESC(...);
 
 static int lp_threads[MINORS];
-module_param_array(lp_threads, int, NULL, 0744);
+module_param_array(lp_threads, int, NULL, 0660);
 MODULE_PARM_DESC(...);
+\end{lstlisting}
+\chapter{How To Use}
+
+Commands for kernel module (in \emph{/code/}): 
+
+\begin{lstlisting}[language=Bash]
+#Compile kernel module (on /multi_flow/code/)
+make all
+
+#Clean objects file
+make clean
+
+#Insertion kernel module
+sudo insmod multi_flow.ko
+
+#Remove kernel module
+sudo rmmod multi_flow.ko
+\end{lstlisting}
+
+Commands for parameters (in \emph{/code/}): 
+
+\begin{lstlisting}[language=Bash]
+#Show kernel module's parameters (i.e. enabled_device, hp_bytes, lp_bytes, hp_threads, lp_threads)
+make show-device
+make show-hp_bytes
+make show-lp_bytes
+make show-hp_threads
+make show-lp_threads
+\end{lstlisting}
+
+Commands for user (in \emph{/code/user}): 
+
+\begin{lstlisting}[language=Bash]
+#Compile user (on /multi_flow/code/user/)
+make
+
+#Run user 
+sudo ./user /dev/test 240 1
+
+#Disable a list of devices by index (file in /code/user/)
+sudo python3 script.py 1 2 45 127
 \end{lstlisting}
 
 
-
-\chapter{User}
-\chapter{Reference}
 \end{document}          

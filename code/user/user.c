@@ -17,7 +17,7 @@ char buff[4096];
 char out[OUT_LEN];
 int blocking;
 
-void *get_setting(int fd)
+int get_setting(int fd)
 {
         int input = 0, ret;
         long int timeout;
@@ -61,13 +61,13 @@ void *get_setting(int fd)
                 }
         }
 
-        return NULL;
+        return 0;
 
 exit:
 
         printf("Error on ioctl() (%s)\n", strerror(errno));
         close(fd);
-        return NULL;
+        return -1;
 
 }
 
@@ -100,7 +100,7 @@ void *get_operation(int fd)
                         memset(out, 0, OUT_LEN);
                         break;
                 case 3:
-                        get_setting(fd);
+                        if (get_setting(fd) != 0) break;
                 case 4:
                         break;
                 default:
@@ -151,7 +151,7 @@ int main(int argc, char **argv)
                 return -1;
         }
 
-        get_setting(fd);
+        if (get_setting(fd) != 0) return -1;
         get_operation(fd);
 
         return 0;

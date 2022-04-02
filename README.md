@@ -58,7 +58,7 @@ make show-lp_bytes
 make show-hp_threads
 make show-lp_threads
 
-#Set enabled_device (file in /code/user/)
+#Disable a list of devices by index (file in /code/user/)
 sudo python3 script.py 1 2 45 127
 ```
 

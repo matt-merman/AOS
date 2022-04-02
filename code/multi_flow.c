@@ -38,7 +38,7 @@ static int dev_open(struct inode *inode, struct file *file)
    if (session == NULL)
    {
       printk("%s: unable to allocate new session\n", MODNAME);
-      return -1;
+      return -ENOMEM;
    }
 
    session->priority = HIGH_PRIORITY;
