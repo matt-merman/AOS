@@ -77,8 +77,8 @@ typedef struct _object_state
 typedef struct _session
 {
 
-        bool priority;         // priority level (high or low) for the operations
-        bool blocking;         // blocking vs non-blocking read and write operations
+        int priority;         // priority level (high or low) for the operations
+        int blocking;         // blocking vs non-blocking read and write operations
         unsigned long timeout; // setup of a timeout regulating the awake of blocking operations
 
 } session;
