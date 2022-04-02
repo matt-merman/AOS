@@ -4,3 +4,7 @@
 *.dvi
 *.toc
 *.synctex.gz
+*.bcf
+*.out
+*.run.xml
+
