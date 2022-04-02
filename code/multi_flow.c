@@ -111,7 +111,7 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
       ret = len;
    }
 
-   return ret; //(*)
+   return ret;
 }
 
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)

@@ -7,7 +7,7 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{biblatex}
-
+\usepackage{float}
 \graphicspath{ {./images/} }
 \definecolor{dkgreen}{rgb}{0,0.6,0}
 \definecolor{gray}{rgb}{0.5,0.5,0.5}
@@ -114,7 +114,7 @@ typedef struct _session{
 } session;
 \end{lstlisting}
 
-It is single for each thread, unlike the \emph{\_object\_state} unique for each device file.
+It is unique for each thread, unlike the \emph{\_object\_state} defined for every device file.
 
 \begin{lstlisting}
 //FILE: info.h
@@ -138,13 +138,16 @@ session->timeout = 0;
 file->private_data = session;
 \end{lstlisting}
 
-The field \emph{unsigned long timeout} indicates the maximum time (expressed as microseconds) in blocking operations (i.e. read, write), for which the user waits. 
+The field \emph{unsigned long timeout} indicates the maximum time (expressed as microseconds) awaited in blocking operations (see Sec. \ref{chap:blocking operation}). 
 
 Parameter setting is done within \emph{dev\_ioctl()}:
 
 \begin{lstlisting}
 //FILE: multi_flow.c
-static long dev_ioctl(struct file *filp, unsigned int command, unsigned long param){
+static long dev_ioctl(struct file *filp, 
+	unsigned int command, 
+	unsigned long param){
+
 	session *session;
 	session = filp->private_data;
 	
@@ -158,18 +161,15 @@ static long dev_ioctl(struct file *filp, unsigned int command, unsigned long par
 		session->timeout = param;
 		//...
 		break;
-	default:
-		//...
-	}
-return 0;
+	//...
 }
 \end{lstlisting}
 
 To associate the session to a user, the field \emph{private\_data} of \emph{struct file *filp} has been used. 
 
 \section{Blocking Operation}
-
-In a blocking operation the thread goes to sleep, in the respective wait queue of the object\footnote{There are  two for each object: a low and high priority}, in case it fails to take the lock. 
+\label{chap:blocking operation}
+For blocking operations the thread goes to sleep, in the respective wait queue of the object\footnote{There are  two for each object: a low and high priority queue.}, in case it fails to take the lock. 
 
 \begin{lstlisting}
 //FILE: common.h
@@ -182,12 +182,14 @@ static int blocking(unsigned long timeout, struct mutex *mutex, wait_queue_head_
 }
 \end{lstlisting}
 
-The thread waits for a certain time, until the lock is released. Time passed to \emph{wait\_event\_timeout()} is converted from microseconds to jiffies with \emph{msecs\_to\_jiffies()}. An error code\footnote{EAGAIN: Resource temporarily unavailable.} is returned if the timer has expired.
+To wake all threads sleeping on the given wait queue, \emph{wake\_up()} is invoked at the end of every operations (after having released the lock). 
+
+Threads wait for a certain time, until the lock is released. Time passed to \emph{wait\_event\_timeout()} is converted from microseconds to jiffies with \emph{msecs\_to\_jiffies()}. An error code\footnote{EAGAIN: Resource temporarily unavailable.} is returned if the timer has expired.
 
 \section{Write Operation}
 \label{chap:write operation}
 
-Unlike the read op. (see Chap. \ref{chap:read operation}) the write can be done with low priority (based on delayed work). In this way the operation is performed by system daemons\footnote{Unlike  tasklets, work queues allow you to queue blocking activities, executed by threads in charge of doing this.}.
+Unlike read operations (see Sec. \ref{chap:read operation}), write can be done with low priority (based on delayed work). In this way the operation is performed by system daemons\footnote{Work queues allow you to queue blocking activities, executed by threads in charge of doing this.}.
 
 \begin{lstlisting}
 //FILE: multi_flow.c
@@ -226,16 +228,9 @@ long put_work(struct file *filp,
 }
 \end{lstlisting}
 
-For each write operation a new node and buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not whole pages like \emph{get\_free\_page()}.} are allocated. The buffer's size is equal to the amount of Bytes the user wants to write. Finally the new node is added to the list (one for each stream).
+For each write operation a new \emph{memory\_node} (see Sec. \ref{chap:read operation}) and buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not whole pages like \emph{get\_free\_page()}.}) are allocated. The buffer's size is equal to the amount of Bytes written from the user. Finally the new node is added to a list (one for every stream). See Image \ref{fig:write}.
 
-\begin{figure}[h]
-	\centering
-	\includegraphics[scale = .45]{write.jpg}
-	\caption{Example of write operation}
-	\label{fig:write}
-\end{figure}
-
-\emph{copy\_from\_user()} may sleep if pagefaults are enabled. That's why it is invoked before requiring the lock on the flow\footnote{As an alternative could be invoked the \emph{\_\_copy\_to\_user\_inatomic()} (see \href{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html}{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html})}.
+\emph{copy\_from\_user()} may sleep if pagefaults are enabled. That's why it is invoked before requiring the lock on the flow\footnote{An alternative could be to invoke \emph{\_\_copy\_to\_user\_inatomic()} (see \href{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html}{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html})}.
 
 \begin{lstlisting}
 //FILE: write.h
@@ -249,10 +244,9 @@ int write(object_state *the_object,
 	//...
 	node = kmalloc(sizeof(memory_node), GFP_ATOMIC);
 	buffer = kmalloc(len, GFP_ATOMIC);
-	if (node == NULL || buffer == NULL)
-	{
-	printk("%s: unable to allocate a memory\n", MODNAME);
-	return -ENOMEM;
+	if (node == NULL || buffer == NULL){
+		printk("%s: unable to allocate a memory\n", MODNAME);
+		return -ENOMEM;
 	}
 	
 	ret = copy_from_user(buffer, buff, len);
@@ -262,10 +256,18 @@ int write(object_state *the_object,
 	//...
 \end{lstlisting}
 
+\begin{figure}[H]
+\label{fig:write}
+	\centering
+	\includegraphics[scale = .45]{write.jpg}
+	\caption{Example of write operation}
+	\label{fig:write}
+\end{figure}
+
 \section{Read Operation}
 \label{chap:read operation}
 
-Read operations are all performed synchronously (without delayed work as for write op.), when an invocation occurs the data structure for one of the two flows is set:
+Read operations are all performed synchronously (without delayed work as for write op.). When an invocation occurs the data structure for one of the two flows is set:
 
 \begin{lstlisting}
 //FILE: multi_flow.c
@@ -279,7 +281,7 @@ if (session->priority == HIGH_PRIORITY){
 ret = read(priority_obj, buff, off, len, session, minor);
 \end{lstlisting}
 
-In addition, they involved deleting the bytes read by the user, on the current flow. To do this a linked list was used, in which each node keeps the following fields:
+In addition, they involved deleting bytes read by the user, on the current flow. To do this a linked list was used, in which each node keeps the following fields:
 
 \begin{lstlisting}
 //FILE: info.h
@@ -289,7 +291,7 @@ typedef struct _memory_node{
 } memory_node;
 \end{lstlisting}
 
-Each node points to its own buffer, the size of which can then be different for all items in the linked list. Buffers are allocated in write operations (see Chap.\ref{chap:write operation}). If the user requests the reading of a smaller number of bytes, than those written on all nodes, the deletion happens for the read bytes only and not on the entire buffer (see Fig.\ref{fig:read}). Reading begins from the first written node (\textbf{First-in-First-out policy}). 
+Each node points to its own buffer, the size of which can then be different for all items. Buffers are allocated in write operations (see Sec. \ref{chap:write operation}). If the user requests the reading of a smaller number of bytes, than those written on all nodes, the deletion happens for the only read bytes, not on the entire buffer (see Fig. \ref{fig:read}). Reading and deletion begin from the first node (\textbf{First-in-First-out policy}). 
 
 \begin{figure}[h]
 	\centering
@@ -373,14 +375,31 @@ make show-lp_threads
 Commands for user (in \emph{/code/user}): 
 
 \begin{lstlisting}[language=Bash]
-#Compile user (on /multi_flow/code/user/)
+#Compile user
 make
 
 #Run user 
 sudo ./user /dev/test 240 1
 
-#Disable a list of devices by index (file in /code/user/)
-sudo python3 script.py 1 2 45 127
+#Disable a list of devices by index
+sudo python3 script.py 0 1 2 45 127
+\end{lstlisting}
+
+To test blocking operations a macro is defined: 
+
+\begin{lstlisting}
+//FILE: info.h
+#define TEST
+\end{lstlisting}
+
+\emph{TEST} does not release the lock after a write, and does not wake up the  threads in the wait queue. 
+
+\begin{lstlisting}
+//FILE write.c
+#ifndef TEST   
+	mutex_unlock(&(the_object->operation_synchronizer));
+	wake_up(wq);
+#endif
 \end{lstlisting}
 
 
