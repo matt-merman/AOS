@@ -345,6 +345,29 @@ MODULE_PARM_DESC(...);
 \end{lstlisting}
 \chapter{How To Use}
 
+\section{Organization}
+The structure of the code is as follows:
+
+\begin{enumerate}
+	\item in \emph{/code/}
+		\begin{enumerate}
+			\item \emph{common.h}
+			\item \emph{info.h}
+			\item \emph{Makefile}
+			\item \emph{multi\_flow.h}
+			\item \emph{read.h}
+			\item \emph{/user/}
+			\item \emph{write.h}
+		\end{enumerate}
+	\item in \emph{/code/user/}
+		\begin{enumerate}
+			\item \emph{Makefile}
+			\item \emph{script.py}
+			\item \emph{user.c}
+		\end{enumerate}
+\end{enumerate}
+
+\section{Commands}
 Commands for kernel module (in \emph{/code/}): 
 
 \begin{lstlisting}[language=Bash]
