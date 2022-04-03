@@ -21,7 +21,6 @@ int get_setting(int fd)
 {
         int input = 0, ret;
         long int timeout;
-        blocking = 0;
         while (input != 7)
         {
 
@@ -35,6 +34,7 @@ int get_setting(int fd)
 
                 case 3: case 4: case 5: case 6:
 
+                        blocking = 0;
                         ret = ioctl(fd, input, timeout);
                         if (ret == -1) goto exit;
                         break;
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
 {       
         int major, minor, i;
         char *path;
-
+        blocking = 0;
         if (argc < 4)
         {
                 printf("Usage: ./sudo user [Path Device File] [Major Number] [Minor number]\n");

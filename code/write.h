@@ -31,6 +31,7 @@ int write(object_state *the_object,
 
         node = kmalloc(sizeof(memory_node), GFP_ATOMIC);
         buffer = kmalloc(len, GFP_ATOMIC);
+
         if (node == NULL || buffer == NULL)
         {
                 printk("%s: unable to allocate a memory\n", MODNAME);
@@ -58,7 +59,7 @@ int write(object_state *the_object,
 
         node->next = NULL;
         node->buffer = NULL;
-
+ 
         *off += (len - ret);
 
 #ifndef TEST   

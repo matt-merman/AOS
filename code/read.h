@@ -65,7 +65,7 @@ int read(object_state *the_object,
       {
 
          residual_bytes -= lenght_buffer;
-         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], lenght_buffer);
+         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], lenght_buffer); 
          ret += lenght_buffer;
 
          if (current_node->next == NULL)
@@ -85,8 +85,8 @@ int read(object_state *the_object,
 
    // PHASE 2: REMOVING
    current_node = the_object->head;
-
-   if (current_node->buffer == NULL) goto exit;
+   if (current_node->buffer == NULL)
+      goto exit;
 
    lenght_buffer = strlen(current_node->buffer);
    
@@ -101,6 +101,21 @@ int read(object_state *the_object,
          residual_bytes -= lenght_buffer;
          AUDIT printk("%s: removing data '%s' from the flow on dev\n", MODNAME, current_node->buffer);
 
+         if (residual_bytes == 0){
+
+            kfree(current_node->buffer);
+            current_node->buffer = NULL;
+
+            if (current_node->next != NULL)
+            {
+               the_object->head = current_node->next;
+               kfree(current_node);
+            }
+
+            goto exit;
+
+         }
+         
          last_node = current_node->next;
          kfree(current_node->buffer);
          kfree(current_node);
@@ -140,10 +155,8 @@ int read(object_state *the_object,
    {
 
       current_node = shift_buffer(lenght_buffer, len, current_node);
-      if (current_node == NULL){
+      if (current_node == NULL)
          exit_mem = 1;
-         goto exit; 
-      }
    }
 
 exit:

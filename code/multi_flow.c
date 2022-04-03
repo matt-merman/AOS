@@ -24,7 +24,7 @@ static int dev_open(struct inode *inode, struct file *file)
 
    session *session;
    int minor = get_minor(file);
-
+   
    if (minor >= MINORS) return -ENODEV;
 
    if(enabled_device[minor]){
