@@ -33,7 +33,7 @@ static int dev_open(struct inode *inode, struct file *file)
       return -ENOENT;
    }
 
-   session = kmalloc(sizeof(session), GFP_ATOMIC);
+   session = kzalloc(sizeof(session), GFP_ATOMIC);
    AUDIT printk("%s: ALLOCATED new session\n", MODNAME);
    if (session == NULL)
    {
@@ -100,7 +100,7 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
    #endif
 
-      ret = put_work(filp, buff, len, off, priority_obj, session, minor);
+      ret = put_work(filp, (char *)buff, len, off, priority_obj, session, minor);
       if (ret != 0)
       {
          printk("%s: Error on LOW-PRIORITY write on dev with [major,minor] number "\
@@ -221,7 +221,7 @@ int init_module(void)
          mutex_init(&(objects[i][j].operation_synchronizer));
 
          // reserve memory to write op.
-         objects[i][j].head = kmalloc(sizeof(memory_node), GFP_KERNEL);
+         objects[i][j].head = kzalloc(sizeof(memory_node), GFP_KERNEL);
          if (objects[i][j].head == NULL)
          {
             printk("%s: unable to allocate a new memory node\n", MODNAME);

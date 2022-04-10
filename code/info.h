@@ -17,6 +17,7 @@
 #include <linux/version.h> /* For LINUX_VERSION_CODE */
 #include <linux/moduleparam.h>
 #include <linux/jiffies.h>
+#include <linux/slab.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mattia Di Battista");

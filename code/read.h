@@ -7,8 +7,8 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
 {
 
    int dim = lenght - offset;
-   
-   char *remaning_buff = kmalloc(dim, GFP_ATOMIC);
+
+   char *remaning_buff = kzalloc(dim, GFP_ATOMIC);
 
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (remaning_buff == NULL)
@@ -20,7 +20,7 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
    strncpy(remaning_buff, &node->buffer[offset], lenght);
    kfree(node->buffer);
 
-   node->buffer = kmalloc(dim, GFP_ATOMIC);
+   node->buffer = kzalloc(dim, GFP_ATOMIC);
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (node->buffer == NULL)
    {
@@ -34,24 +34,28 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
    return node;
 }
 
-int read(object_state *the_object, 
-   char *buff, 
-   loff_t *off, 
-   size_t len, 
-   session *session,
-   int minor)
+int read(object_state *the_object,
+         char *buff,
+         loff_t *off,
+         size_t len,
+         session *session,
+         int minor)
 {
 
    int ret = 0, residual_bytes = len, lenght_buffer = 0, exit_mem = 0;
    memory_node *current_node, *last_node;
    wait_queue_head_t *wq;
- 
+
    wq = get_lock(the_object, session, minor);
-   if (wq == NULL) return -EAGAIN;
+   if (wq == NULL)
+      return -EAGAIN;
 
    *off = 0;
 
    current_node = the_object->head;
+   if (current_node->buffer == NULL)
+      goto exit;
+
    // PHASE 1: READING
    while (residual_bytes != 0)
    {
@@ -65,7 +69,7 @@ int read(object_state *the_object,
       {
 
          residual_bytes -= lenght_buffer;
-         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], lenght_buffer); 
+         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], lenght_buffer);
          ret += lenght_buffer;
 
          if (current_node->next == NULL)
@@ -83,73 +87,54 @@ int read(object_state *the_object,
       }
    }
 
-   // PHASE 2: REMOVING
    current_node = the_object->head;
-   if (current_node->buffer == NULL)
-      goto exit;
-
    lenght_buffer = strlen(current_node->buffer);
-   
-   if (len > lenght_buffer)
+   residual_bytes = len;
+
+   // PHASE 2: REMOVING
+   while (!(residual_bytes < lenght_buffer))
    {
 
-      residual_bytes = len;
+      residual_bytes -= lenght_buffer;
+      AUDIT printk("%s: removing data '%s' from the flow on dev\n", MODNAME, current_node->buffer);
 
-      while (!(residual_bytes < lenght_buffer))
+      if (residual_bytes == 0)
       {
 
-         residual_bytes -= lenght_buffer;
-         AUDIT printk("%s: removing data '%s' from the flow on dev\n", MODNAME, current_node->buffer);
-
-         if (residual_bytes == 0){
-
-            kfree(current_node->buffer);
-            current_node->buffer = NULL;
-
-            if (current_node->next != NULL)
-            {
-               the_object->head = current_node->next;
-               kfree(current_node);
-            }
-
-            goto exit;
-
-         }
-         
-         last_node = current_node->next;
          kfree(current_node->buffer);
-         kfree(current_node);
+         current_node->buffer = NULL;
 
-         if (last_node != NULL && last_node->buffer != NULL)
+         if (current_node->next != NULL)
          {
-            lenght_buffer = strlen(last_node->buffer);
-            current_node = last_node;
-            continue;
+            the_object->head = current_node->next;
+            kfree(current_node);
          }
-
-         else if (last_node->buffer == NULL)
-            the_object->head = last_node;
 
          goto exit;
       }
 
-      the_object->head = shift_buffer(lenght_buffer, residual_bytes, last_node);
-      if (the_object->head == NULL){
-         exit_mem = 1;
-         goto exit; 
-      }
-   }
-   else if (len == lenght_buffer)
-   {
-
+      last_node = current_node->next;
       kfree(current_node->buffer);
-      current_node->buffer = NULL;
+      kfree(current_node);
 
-      if (current_node->next != NULL)
+      if (last_node != NULL && last_node->buffer != NULL)
       {
-         the_object->head = current_node->next;
-         kfree(current_node);
+         lenght_buffer = strlen(last_node->buffer);
+         current_node = last_node;
+         continue;
       }
+
+      else if (last_node->buffer == NULL)
+         the_object->head = last_node;
+
+      goto exit;
+   }
+
+   if (len > lenght_buffer)
+   {
+      the_object->head = shift_buffer(lenght_buffer, residual_bytes, last_node);
+      if (the_object->head == NULL)
+         exit_mem = 1;
    }
    else
    {
@@ -162,15 +147,17 @@ int read(object_state *the_object,
 exit:
 
    *off += len - ret;
-   
-   if(session->priority == HIGH_PRIORITY) hp_bytes[minor] -= ret;
-   else lp_bytes[minor] -= ret;
+
+   if (session->priority == HIGH_PRIORITY)
+      hp_bytes[minor] -= ret;
+   else
+      lp_bytes[minor] -= ret;
 
    mutex_unlock(&(the_object->operation_synchronizer));
    wake_up(wq);
 
-   if(exit_mem) return -ENOMEM;
+   if (exit_mem)
+      return -ENOMEM;
 
    return ret;
-
 }

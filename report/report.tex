@@ -129,7 +129,7 @@ typedef struct _object_state{
 
 \begin{lstlisting}
 //FILE: multi_flow.c
-session = kmalloc(sizeof(session), GFP_KERNEL);
+session = kzalloc(sizeof(session), GFP_KERNEL);
 //...
 if (session == NULL) //...
 session->priority = HIGH_PRIORITY;
@@ -211,7 +211,7 @@ To define deferred work:
 \begin{lstlisting}
 //FILE: write.h
 long put_work(struct file *filp,
-	const char *buff,
+	char *buff,
 	size_t len,
 	loff_t *off,
 	object_state *the_object,
@@ -228,7 +228,23 @@ long put_work(struct file *filp,
 }
 \end{lstlisting}
 
-For each write operation a new \emph{memory\_node} (see Sec. \ref{chap:read operation}) and buffer (both with \emph{kmalloc()}\footnote{This API allows to reserve Bytes and not whole pages like \emph{get\_free\_page()}.}) are allocated. The buffer's size is equal to the amount of Bytes written from the user. Finally the new node is added to a list (one for every stream). See Image \ref{fig:write}.
+Moreover in the case the user is notified that his bytes have been written. This implies that low priority write operation cannot fail, so deamon waits until the lock is released.
+
+\begin{lstlisting}
+// FILE: write.h 
+if (session->priority == LOW_PRIORITY){
+	__sync_add_and_fetch (&lp_threads[minor], 1);
+	mutex_lock(&(the_object->operation_synchronizer));
+	__sync_add_and_fetch (&lp_threads[minor], -1);
+	wq = &the_object->wq;
+}else{
+	wq = get_lock(the_object, session, minor);
+	if (wq == NULL)
+		return -EAGAIN;
+}
+\end{lstlisting}
+
+For each write operation a new \emph{memory\_node} (see Sec. \ref{chap:read operation}) and buffer (both with \emph{kzalloc()}\footnote{This API allows to reserve Bytes and not whole pages like \emph{get\_free\_page()}.}) are allocated. The buffer's size is equal to the amount of Bytes written from the user. Finally the new node is added to a list (one for every stream). See Image \ref{fig:write}.
 
 \emph{copy\_from\_user()} may sleep if pagefaults are enabled. That's why it is invoked before requiring the lock on the flow\footnote{An alternative could be to invoke \emph{\_\_copy\_to\_user\_inatomic()} (see \href{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html}{https://www.kernel.org/doc/htmldocs/kernel-api/API---copy-to-user-inatomic.html})}.
 
@@ -242,8 +258,8 @@ int write(object_state *the_object,
 	int minor){
 
 	//...
-	node = kmalloc(sizeof(memory_node), GFP_ATOMIC);
-	buffer = kmalloc(len, GFP_ATOMIC);
+	node = kzalloc(sizeof(memory_node), GFP_ATOMIC);
+	buffer = kzalloc(len, GFP_ATOMIC);
 	if (node == NULL || buffer == NULL){
 		printk("%s: unable to allocate a memory\n", MODNAME);
 		return -ENOMEM;

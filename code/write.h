@@ -2,13 +2,14 @@
 
 int write(object_state *, const char *, loff_t *, size_t, session *, int);
 void delayed_write(unsigned long);
-long put_work(struct file *, const char *, size_t, loff_t *, object_state *, session *, int);
+long put_work(struct file *, char *, size_t, loff_t *, object_state *, session *, int);
 
 typedef struct _packed_work
 {
+        void *buffer;
         struct work_struct the_work;
         struct file *filp;
-        const char *buff;
+        const char *data;
         size_t len;
         loff_t *off;
         object_state *the_object;
@@ -18,8 +19,8 @@ typedef struct _packed_work
 
 int write(object_state *the_object,
           const char *buff,
-          loff_t *off, 
-          size_t len, 
+          loff_t *off,
+          size_t len,
           session *session,
           int minor)
 {
@@ -29,8 +30,8 @@ int write(object_state *the_object,
         int ret;
         wait_queue_head_t *wq;
 
-        node = kmalloc(sizeof(memory_node), GFP_ATOMIC);
-        buffer = kmalloc(len, GFP_ATOMIC);
+        node = kzalloc(sizeof(memory_node), GFP_ATOMIC);
+        buffer = kzalloc(len, GFP_ATOMIC);
 
         if (node == NULL || buffer == NULL)
         {
@@ -40,8 +41,17 @@ int write(object_state *the_object,
 
         ret = copy_from_user(buffer, buff, len);
 
-        wq = get_lock(the_object, session, minor);
-        if (wq == NULL) return -EAGAIN;
+        // low priority write op. cannot fail 
+        if (session->priority == LOW_PRIORITY){
+                __sync_add_and_fetch (&lp_threads[minor], 1);
+                mutex_lock(&(the_object->operation_synchronizer));
+                __sync_add_and_fetch (&lp_threads[minor], -1);
+                wq = &the_object->wq;
+        }else{
+                wq = get_lock(the_object, session, minor);
+                if (wq == NULL)
+                        return -EAGAIN;
+        }
 
         if(session->priority == HIGH_PRIORITY) hp_bytes[minor] += len;
         else lp_bytes[minor] += len;
@@ -73,11 +83,18 @@ void delayed_write(unsigned long data)
 {
         session *session = container_of((void *)data, packed_work, the_work)->session;
         int minor = container_of((void *)data, packed_work, the_work)->minor;
-
         size_t len = container_of((void *)data, packed_work, the_work)->len;
         loff_t *off = container_of((void *)data, packed_work, the_work)->off;
         object_state *the_object = container_of((void *)data, packed_work, the_work)->the_object;
-        const char *buff = container_of((void *)data, packed_work, the_work)->buff;
+
+        char *buff = kzalloc(len, GFP_ATOMIC); // non blocking memory allocation
+        if (buff == NULL)
+        {
+                printk("%s: tasklet buffer allocation failure\n", MODNAME);
+                goto exit;
+        }
+
+        buff = (char *)container_of((void *)data, packed_work, the_work)->data;
 
         AUDIT printk("%s: this print comes from kworker daemon with PID=%d - running on CPU-core %d\n", MODNAME, current->pid, smp_processor_id());
 
@@ -85,13 +102,16 @@ void delayed_write(unsigned long data)
 
         AUDIT printk("%s: releasing the task buffer at address %p - container of task is at %p\n", MODNAME, (void *)data, container_of((void *)data, packed_work, the_work));
 
-        kfree((void *)container_of((void *)data, packed_work, the_work));
+        kfree(buff);
 
+exit:
+
+        kfree((void *)container_of((void *)data, packed_work, the_work));
         module_put(THIS_MODULE);
 }
 
 long put_work(struct file *filp,
-              const char *buff,
+              char *buff,
               size_t len,
               loff_t *off,
               object_state *the_object,
@@ -107,7 +127,6 @@ long put_work(struct file *filp,
         AUDIT printk("%s: requested deferred work\n", MODNAME);
 
         the_task = kzalloc(sizeof(packed_work), GFP_ATOMIC); // non blocking memory allocation
-
         if (the_task == NULL)
         {
                 printk("%s: tasklet buffer allocation failure\n", MODNAME);
@@ -115,13 +134,23 @@ long put_work(struct file *filp,
                 return -ENOMEM;
         }
 
+        the_task->buffer = the_task;
         the_task->filp = filp;
-        the_task->buff = buff;
         the_task->len = len;
         the_task->off = off;
         the_task->the_object = the_object;
         the_task->session = session;
         the_task->minor = minor;
+
+        the_task->data = kzalloc(len, GFP_ATOMIC); // non blocking memory allocation
+        if (the_task->data == NULL)
+        {
+                printk("%s: tasklet buffer allocation failure\n", MODNAME);
+                module_put(THIS_MODULE);
+                return -ENOMEM;
+        }
+
+        strncpy((char *)the_task->data, buff, len);
 
         AUDIT printk("%s: work buffer allocation success - address is %p\n", MODNAME, the_task);
 
