@@ -1,18 +1,17 @@
 #include "common.h"
+#include "info.h"
 
 int write(object_state *, const char *, loff_t *, size_t, session *, int);
 void delayed_write(unsigned long);
-long put_work(struct file *, char *, size_t, loff_t *, object_state *, session *, int);
+long put_work(char *, size_t, loff_t *, session *, int);
 
 typedef struct _packed_work
 {
         void *buffer;
         struct work_struct the_work;
-        struct file *filp;
         const char *data;
         size_t len;
         loff_t *off;
-        object_state *the_object;
         session *session;
         int minor;
 } packed_work;
@@ -76,7 +75,7 @@ int write(object_state *the_object,
         mutex_unlock(&(the_object->operation_synchronizer));
         wake_up(wq);
 #endif
-        return len - ret;
+        return ret;
 }
 
 void delayed_write(unsigned long data)
@@ -85,7 +84,8 @@ void delayed_write(unsigned long data)
         int minor = container_of((void *)data, packed_work, the_work)->minor;
         size_t len = container_of((void *)data, packed_work, the_work)->len;
         loff_t *off = container_of((void *)data, packed_work, the_work)->off;
-        object_state *the_object = container_of((void *)data, packed_work, the_work)->the_object;
+        
+        object_state *the_object = objects[minor];
 
         char *buff = kzalloc(len, GFP_ATOMIC); // non blocking memory allocation
         if (buff == NULL)
@@ -110,11 +110,9 @@ exit:
         module_put(THIS_MODULE);
 }
 
-long put_work(struct file *filp,
-              char *buff,
+long put_work(char *buff,
               size_t len,
               loff_t *off,
-              object_state *the_object,
               session *session,
               int minor)
 {
@@ -135,10 +133,8 @@ long put_work(struct file *filp,
         }
 
         the_task->buffer = the_task;
-        the_task->filp = filp;
         the_task->len = len;
         the_task->off = off;
-        the_task->the_object = the_object;
         the_task->session = session;
         the_task->minor = minor;
 

@@ -34,7 +34,7 @@ int get_setting(int fd)
 
                 case 3: case 4: case 5: case 6:
 
-                        blocking = 0;
+                        if(input == 6) blocking = 0;
                         ret = ioctl(fd, input, timeout);
                         if (ret == -1) goto exit;
                         break;

@@ -84,4 +84,6 @@ typedef struct _session
 
 } session;
 
+object_state objects[MINORS][NUM_FLOW];
+
 #endif

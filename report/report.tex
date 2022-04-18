@@ -200,9 +200,9 @@ if (session->priority == HIGH_PRIORITY){
 }else{
 	priority_obj = &the_object[LOW_PRIORITY];
 	//...	
-	ret = put_work(filp, buff, len, off, priority_obj, session, minor);
+	ret = put_work(buff, len, off, session, minor);
 	if (ret != 0) //...
-	ret = len;
+	return len;
 }
 \end{lstlisting}
 
@@ -210,11 +210,9 @@ To define deferred work:
 
 \begin{lstlisting}
 //FILE: write.h
-long put_work(struct file *filp,
-	char *buff,
+long put_work(char *buff,
 	size_t len,
 	loff_t *off,
-	object_state *the_object,
 	session *session,
 	int minor){
 	

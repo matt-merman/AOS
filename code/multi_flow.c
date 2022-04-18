@@ -17,8 +17,6 @@ static int Major; /* Major number assigned to broadcast device driver */
 #define get_minor(session) MINOR(session->f_dentry->d_inode->i_rdev)
 #endif
 
-object_state objects[MINORS][NUM_FLOW];
-
 static int dev_open(struct inode *inode, struct file *file)
 {
 
@@ -100,7 +98,7 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
    #endif
 
-      ret = put_work(filp, (char *)buff, len, off, priority_obj, session, minor);
+      ret = put_work((char *)buff, len, off, session, minor);
       if (ret != 0)
       {
          printk("%s: Error on LOW-PRIORITY write on dev with [major,minor] number "\
@@ -108,10 +106,10 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
          return ret;
       }
       
-      ret = len;
+      return len;
    }
 
-   return ret;
+   return len - ret;
 }
 
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
@@ -156,7 +154,7 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
 
    ret = read(priority_obj, buff, off, len, session, minor);
 
-   return ret;
+   return len - ret;
 }
 
 static long dev_ioctl(struct file *filp, unsigned int command, unsigned long param)
