@@ -154,7 +154,7 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
 
    ret = read(priority_obj, buff, off, len, session, minor);
 
-   return len - ret;
+   return ret;
 }
 
 static long dev_ioctl(struct file *filp, unsigned int command, unsigned long param)

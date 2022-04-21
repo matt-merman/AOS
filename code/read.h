@@ -42,7 +42,7 @@ int read(object_state *the_object,
          int minor)
 {
 
-   int ret = 0, residual_bytes = len, lenght_buffer = 0, exit_mem = 0, index = 0;
+   int ret = 0, residual_bytes = len, lenght_buffer = 0, exit_mem = 0;
    memory_node *current_node, *last_node;
    wait_queue_head_t *wq;
 
@@ -69,8 +69,8 @@ int read(object_state *the_object,
       {
 
          residual_bytes -= lenght_buffer;
-         ret += copy_to_user(&buff[index], &current_node->buffer[*off], lenght_buffer);
-         index += lenght_buffer;
+         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], lenght_buffer);
+         ret += lenght_buffer;
 
          if (current_node->next == NULL)
             break;
@@ -80,8 +80,8 @@ int read(object_state *the_object,
       else
       {
 
-         ret += copy_to_user(&buff[index], &current_node->buffer[*off], residual_bytes);
-         index += residual_bytes;
+         ret += copy_to_user(&buff[ret], &current_node->buffer[*off], residual_bytes);
+         ret += residual_bytes;
          current_node = current_node->next;
          break;
       }
@@ -149,9 +149,9 @@ exit:
    *off += len - ret;
 
    if (session->priority == HIGH_PRIORITY)
-      hp_bytes[minor] -= index;
+      hp_bytes[minor] -= ret;
    else
-      lp_bytes[minor] -= index;
+      lp_bytes[minor] -= ret;
 
    mutex_unlock(&(the_object->operation_synchronizer));
    wake_up(wq);
