@@ -73,43 +73,45 @@ static ssize_t dev_write(struct file *filp, const char *buff, size_t len, loff_t
 
       priority_obj = &the_object[HIGH_PRIORITY];
 
-   #ifdef AUDIT
-      if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING HIGH-PRIORITY write on dev with " \
+      if (session->blocking == BLOCKING){ 
+         AUDIT printk("%s: somebody called a BLOCKING HIGH-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
-      else 
-         printk("%s: somebody called a NON-BLOCKING HIGH-PRIORITY write on dev with " \
+      }else{ 
+         AUDIT printk("%s: somebody called a NON-BLOCKING HIGH-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
-   #endif
-
+      }
       ret = write(priority_obj, buff, off, len, session, minor);
+      if (ret < 0)
+      {
+         AUDIT printk("%s: Error on HIGH-PRIORITY write on dev with [major,minor] number "\
+         "[%d,%d]\n", MODNAME, get_major(filp), minor);
+         return ret;
+      }
+
+      return len - ret;
    }
    else
    {
 
       priority_obj = &the_object[LOW_PRIORITY];
 
-   #ifdef AUDIT
-      if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING LOW-PRIORITY write on dev with " \
+      if (session->blocking == BLOCKING){ 
+         AUDIT printk("%s: somebody called a BLOCKING LOW-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
-      else 
-         printk("%s: somebody called a NON-BLOCKING LOW-PRIORITY write on dev with " \
+      }else{ 
+         AUDIT printk("%s: somebody called a NON-BLOCKING LOW-PRIORITY write on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
-   #endif
-
+      }
       ret = put_work((char *)buff, len, off, session, minor);
       if (ret != 0)
       {
-         printk("%s: Error on LOW-PRIORITY write on dev with [major,minor] number "\
+         AUDIT printk("%s: Error on LOW-PRIORITY write on dev with [major,minor] number "\
          "[%d,%d]\n", MODNAME, get_major(filp), minor);
          return ret;
       }
       
       return len;
    }
-
-   return len - ret;
 }
 
 static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
@@ -126,30 +128,28 @@ static ssize_t dev_read(struct file *filp, char *buff, size_t len, loff_t *off)
 
       priority_obj = &the_object[HIGH_PRIORITY];
 
-   #ifdef AUDIT
-      if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING read on HIGH-PRIORITY flow on dev with " \
+      if (session->blocking == BLOCKING){ 
+         AUDIT printk("%s: somebody called a BLOCKING read on HIGH-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
       
-      else 
-         printk("%s: somebody called a NON-BLOCKING read on HIGH-PRIORITY flow on dev with " \
+      }else{ 
+         AUDIT printk("%s: somebody called a NON-BLOCKING read on HIGH-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
-   #endif
+      }
    }
    else
    {
 
       priority_obj = &the_object[LOW_PRIORITY];
 
-   #ifdef AUDIT
-      if (session->blocking == BLOCKING) 
-         printk("%s: somebody called a BLOCKING read on LOW-PRIORITY flow on dev with " \
+      if (session->blocking == BLOCKING){ 
+         AUDIT printk("%s: somebody called a BLOCKING read on LOW-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
 
-      else 
-         printk("%s: somebody called a NON-BLOCKING read on LOW-PRIORITY flow on dev with " \
+      }else{ 
+         AUDIT printk("%s: somebody called a NON-BLOCKING read on LOW-PRIORITY flow on dev with " \
          "[major,minor] number [%d,%d]\n", MODNAME, get_major(filp), minor);
-   #endif
+      }
    }
 
    ret = read(priority_obj, buff, off, len, session, minor);

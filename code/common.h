@@ -39,7 +39,7 @@ static wait_queue_head_t * get_lock(object_state *the_object, session *session, 
    if (!ret)
    {
 
-      printk("%s: unable to get lock now\n", MODNAME);
+      AUDIT printk("%s: unable to get lock now\n", MODNAME);
       if (session->blocking == BLOCKING)
       {
 

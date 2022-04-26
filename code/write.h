@@ -34,7 +34,7 @@ int write(object_state *the_object,
 
         if (node == NULL || buffer == NULL)
         {
-                printk("%s: unable to allocate a memory\n", MODNAME);
+                AUDIT printk("%s: unable to allocate a memory\n", MODNAME);
                 return -ENOMEM;
         }
 
@@ -90,7 +90,7 @@ void delayed_write(unsigned long data)
         char *buff = kzalloc(len, GFP_ATOMIC); // non blocking memory allocation
         if (buff == NULL)
         {
-                printk("%s: tasklet buffer allocation failure\n", MODNAME);
+                AUDIT printk("%s: tasklet buffer allocation failure\n", MODNAME);
                 goto exit;
         }
 
@@ -127,7 +127,7 @@ long put_work(char *buff,
         the_task = kzalloc(sizeof(packed_work), GFP_ATOMIC); // non blocking memory allocation
         if (the_task == NULL)
         {
-                printk("%s: tasklet buffer allocation failure\n", MODNAME);
+                AUDIT printk("%s: tasklet buffer allocation failure\n", MODNAME);
                 module_put(THIS_MODULE);
                 return -ENOMEM;
         }
@@ -141,7 +141,7 @@ long put_work(char *buff,
         the_task->data = kzalloc(len, GFP_ATOMIC); // non blocking memory allocation
         if (the_task->data == NULL)
         {
-                printk("%s: tasklet buffer allocation failure\n", MODNAME);
+                AUDIT printk("%s: tasklet buffer allocation failure\n", MODNAME);
                 module_put(THIS_MODULE);
                 return -ENOMEM;
         }

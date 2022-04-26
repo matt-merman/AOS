@@ -13,7 +13,7 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (remaning_buff == NULL)
    {
-      printk("%s: unable to allocate memory\n", MODNAME);
+      AUDIT printk("%s: unable to allocate memory\n", MODNAME);
       return NULL;
    }
 
@@ -24,7 +24,7 @@ memory_node *shift_buffer(int lenght, int offset, memory_node *node)
    AUDIT printk("%s: ALLOCATED %d bytes\n", MODNAME, dim);
    if (node->buffer == NULL)
    {
-      printk("%s: unable to allocate memory\n", MODNAME);
+      AUDIT printk("%s: unable to allocate memory\n", MODNAME);
       return NULL;
    }
 
